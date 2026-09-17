@@ -1,10 +1,13 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-mm-page="home">
 <head>
 <meta charset="UTF-8">
+<script src="assets/mm-routes.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
 <title>MODE MODE — Field Studio</title>
+<script>document.documentElement.classList.add('home-boot','logo-waiting');</script>
+<script src="assets/mm-logo-intro.js"></script>
 <style>
   @font-face{font-family:'BB Strata ML';src:url('assets/fonts/BBStrata-MLRegular.woff2') format('woff2'),
     url('assets/fonts/BBStrata-MLRegular.otf') format('opentype');font-weight:400;font-style:normal;font-display:swap;}
@@ -27,6 +30,13 @@
      below the logo without overlap; other pages just override --wm-w. */
   .wordmark{position:fixed;top:var(--wm-top,40px);left:var(--wm-left,40px);user-select:none;z-index:60;color:var(--ink);transition:opacity .15s;}
   .wordmark:hover{opacity:.7;}
+  /* Public chrome is correct before content, fonts, or the roster arrive. */
+  body:not(.studio) .inspector{display:none;}
+  .home-boot:not(.home-ready) .axis,.home-boot:not(.home-ready) .axis-line{visibility:hidden;}
+  .logo-waiting .wordmark .mm-logo{visibility:hidden;}
+  .logo-growth{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
+  .field-entering #field{pointer-events:none;}
+  @media(prefers-reduced-motion:reduce){.logo-waiting .wordmark .mm-logo{visibility:visible;}}
   .wordmark .mm-logo{display:block;width:var(--wm-w,150px);height:auto;}
   .topctrls{position:absolute;top:40px;right:40px;z-index:30;display:flex;align-items:center;gap:9px;}
   body:not(.studio) .topctrls{display:none;}   /* studio chrome (EDIT/PRESENT + light-dark) hidden from the public; reveal with ?studio */
@@ -199,12 +209,12 @@
   body.darkbg .readout .r-name{color:#EDEDE8;} body.darkbg .readout .r-code,body.darkbg .readout .r-row span:first-child{color:#8A8A84;} body.darkbg .readout .r-row{color:#D0D0CA;border-color:#26262C;}
 </style>
 </head>
-<body>
-<script>if(location.search.indexOf('studio')>=0)document.body.classList.add('studio');</script>
+<body class="present">
+<script>if(new URLSearchParams(location.search).has('studio'))document.body.classList.add('studio');</script>
 <div id="stage">
   <canvas id="field"></canvas>
   <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
-  <a class="wordmark" href="index.html" aria-label="MODE MODE — home">
+  <a class="wordmark" href="./" aria-label="MODE MODE — home">
     <svg class="mm-logo" viewBox="0 0 676.58 266.78" fill="currentColor" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="MODE MODE"><path d="M373.79,157.75h0c-6.56,6.59-10.24,15.51-10.24,24.81v49.05c0,9.3,3.68,18.21,10.24,24.8h0c6.6,6.64,15.58,10.37,24.94,10.37h20.79c9.33,0,18.28-3.71,24.87-10.3l.05-.05c6.59-6.6,10.3-15.54,10.3-24.87v-48.96c0-9.33-3.71-18.28-10.3-24.87l-.05-.05c-6.6-6.59-15.54-10.3-24.87-10.3h-20.79c-9.36,0-18.33,3.73-24.93,10.36ZM387.37,243l-.04-.04c-3.03-3-4.73-7.09-4.73-11.35v-49.04c0-4.26,1.7-8.35,4.73-11.35l.04-.04c3-2.97,7.05-4.64,11.27-4.64h20.95c4.24,0,8.31,1.69,11.31,4.68h0c3,3,4.68,7.07,4.68,11.31v49.12c0,4.24-1.69,8.31-4.68,11.31h0c-3,3-7.07,4.68-11.31,4.68h-20.95c-4.22,0-8.27-1.67-11.27-4.64Z"/><path d="M46.69,44.23L19.65,4.19c-1.41-2.09-3.76-3.34-6.28-3.34h-5.8C3.39.86,0,4.25,0,8.43v102.53c0,4.18,3.39,7.58,7.58,7.58h3.99c4.18,0,7.58-3.39,7.58-7.58v-51.09c0-7.58,9.9-10.46,13.97-4.06l9.68,15.24c1.39,2.19,3.8,3.51,6.39,3.51h7.48c2.59,0,5-1.32,6.39-3.51l9.77-15.34c4.07-6.39,13.97-3.51,13.97,4.07v51.17c0,4.18,3.39,7.58,7.58,7.58h3.91c4.18,0,7.58-3.39,7.58-7.58V8.43c0-4.18-3.39-7.58-7.58-7.58h-5.72c-2.52,0-4.87,1.25-6.28,3.34l-27.04,40.04c-3,4.45-9.55,4.45-12.56,0Z"/><path d="M135.84,10.36h0c-6.56,6.59-10.24,15.51-10.24,24.81v49.05c0,9.3,3.68,18.21,10.24,24.8h0c6.6,6.64,15.58,10.37,24.94,10.37h20.79c9.33,0,18.28-3.71,24.87-10.3l.05-.05c6.59-6.6,10.3-15.54,10.3-24.87v-48.96c0-9.33-3.71-18.28-10.3-24.87l-.05-.05c-6.6-6.59-15.54-10.3-24.87-10.3h-20.79c-9.36,0-18.33,3.73-24.93,10.36ZM149.43,95.61l-.04-.04c-3.03-3-4.73-7.09-4.73-11.35v-49.04c0-4.26,1.7-8.35,4.73-11.35l.04-.04c3-2.97,7.05-4.64,11.27-4.64h20.95c4.24,0,8.31,1.69,11.31,4.68h0c3,3,4.68,7.07,4.68,11.31v49.12c0,4.24-1.69,8.31-4.68,11.31h0c-3,3-7.07,4.68-11.31,4.68h-20.95c-4.22,0-8.27-1.67-11.27-4.64Z"/><path d="M476.28,157.77v98.63c0,5.26,4.27,9.53,9.53,9.53h56.39c2.53,0,4.96-1.01,6.75-2.8l20.09-20.16c1.73-1.74,2.73-4.07,2.78-6.53l1.1-52.68c.05-2.31-.74-4.56-2.23-6.33l-21.67-25.79c-1.81-2.15-4.48-3.4-7.29-3.4h-55.91c-5.26,0-9.53,4.27-9.53,9.53ZM495.42,237.26v-60.35c0-5.26,4.27-9.53,9.53-9.53h28.54c2.98,0,5.78,1.39,7.58,3.76l10.82,14.23c1.32,1.73,2,3.86,1.94,6.04l-1.05,37.19c-.07,2.44-1.07,4.76-2.8,6.48l-8.98,8.94c-1.79,1.78-4.2,2.77-6.72,2.77h-29.33c-5.26,0-9.53-4.27-9.53-9.53Z"/><path d="M236.46,10.38v98.63c0,5.26,4.27,9.53,9.53,9.53h56.39c2.53,0,4.96-1.01,6.75-2.8l20.01-20.08c1.78-1.79,2.78-4.2,2.78-6.72V30.46c0-2.52-1-4.94-2.78-6.72l-20.01-20.08c-1.79-1.79-4.22-2.8-6.75-2.8h-56.39c-5.26,0-9.53,4.27-9.53,9.53ZM255.6,89.88V29.53c0-5.26,4.27-9.53,9.53-9.53h29.33c2.52,0,4.93,1,6.72,2.77l8.87,8.83c1.8,1.79,2.81,4.22,2.81,6.75v42.7c0,2.54-1.01,4.97-2.81,6.75l-8.87,8.83c-1.79,1.78-4.2,2.77-6.72,2.77h-29.33c-5.26,0-9.53-4.27-9.53-9.53Z"/><path d="M382.17,74.22h40.13c5.26,0,9.53-4.27,9.53-9.53v-.09c0-5.26-4.27-9.53-9.53-9.53h-40.13c-5.26,0-9.53-4.27-9.53-9.53v-16.02c0-5.26,4.27-9.53,9.53-9.53h44.32c5.26,0,9.53-4.27,9.53-9.53v-.09c0-5.26-4.27-9.53-9.53-9.53h-63.46c-5.26,0-9.53,4.27-9.53,9.53v98.63c0,5.26,4.27,9.53,9.53,9.53h64.31c5.26,0,9.53-4.27,9.53-9.53v-.08c0-5.26-4.27-9.53-9.53-9.53h-45.17c-5.26,0-9.53-4.27-9.53-9.53v-6.13c0-5.26,4.27-9.53,9.53-9.53Z"/><path d="M284.67,191.85l-26.19-38.63c-2.1-3.11-5.61-4.98-9.37-4.98h-.08c-6.24,0-11.31,5.06-11.31,11.31v99.11c0,4.01,3.25,7.27,7.27,7.27h4.6c4.01,0,7.27-3.25,7.27-7.27v-59.05c0-5.35,6.99-7.39,9.87-2.87l11,17.31c3.13,4.92,8.56,7.9,14.39,7.9h0c4,0,7.73-2.04,9.88-5.42l12.66-19.86c2.88-4.51,9.86-2.48,9.86,2.88v59.12c0,4.01,3.25,7.27,7.27,7.27h4.52c4.01,0,7.27-3.25,7.27-7.27v-99.11c0-6.24-5.06-11.31-11.31-11.31h0c-3.76,0-7.27,1.87-9.37,4.98l-26.18,38.63c-2.88,4.27-9.16,4.27-12.04,0Z"/><path d="M612.36,237.26v-6.13c0-5.26,4.27-9.53,9.53-9.53h40.13c5.26,0,9.53-4.27,9.53-9.53v-.09c0-5.26-4.27-9.53-9.53-9.53h-40.13c-5.26,0-9.53-4.27-9.53-9.53v-16.02c0-5.26,4.27-9.53,9.53-9.53h44.31c5.26,0,9.53-4.27,9.53-9.53v-.09c0-5.26-4.27-9.53-9.53-9.53h-63.45c-5.26,0-9.53,4.27-9.53,9.53v98.63c0,5.26,4.27,9.53,9.53,9.53h64.31c5.26,0,9.53-4.27,9.53-9.53v-.08c0-5.26-4.27-9.53-9.53-9.53h-45.17c-5.26,0-9.53-4.27-9.53-9.53Z"/></svg>
   </a>
   <div class="topctrls">
@@ -333,7 +343,7 @@ function seed(){return [
     {id:uid(),x:0.88,y:-0.233,r:0.12,i:0.8,f:2.6,core:false,label:""},
     {id:uid(),x:0.745,y:-0.015,r:0.09,i:0.91,f:2.6,core:false,label:""}]},
 ];}
-let projects=seed(), selProj=projects[0].id, selNode=null, mode='edit', activeSwatch='core', wheelHSV=[0,1,1], blendMode='color-burn';
+let projects=seed(), selProj=projects[0].id, selNode=null, mode='present', activeSwatch='core', wheelHSV=[0,1,1], blendMode='color-burn';
 /* projects with a built case-study page (project.html?p=slug), keyed by code. Extend as pages ship. */
 const PAGES={'P-04':'nightmare-kart','P-03':'gif','P-01':'eyeknow-manor','P-05':'65porter','P-02':'massive','P-06':'selected-arcade'};
 /* hover-image preview by code (one example wired; extend per project) */
@@ -389,6 +399,7 @@ function updateUndoUI(){const u=document.getElementById('undoBtn'),r=document.ge
 const cv=document.getElementById('field'), ctx=cv.getContext('2d');
 let DPR=1,cssW=0,cssH=0,fL,fT,fW,fH,mfd,lowW,lowH,scl;
 const buf={}; let pl={canvas:null,ctx:null}; let alpha={}; let live={}; let dirty=true, lastField=0; let heightBuf=null;
+let introReveal=0,introRadius=.06,introSpread=.30;
 let pert={}; const ANIM_FPS=26;   // per-node render-time animation deltas (not persisted) + field recompute throttle while animating
 let gaCur={}, boostCur={}, lastT=0, globalTab=false, dragFrom=null;   // focus-fade easing (per-project alpha+boost), GLOBAL-tab flag, project drag-reorder index
 let mag={}, magCur={}, lastMagT=0, magWasActive=false;   // cursor-magnet eased per-node pull offsets (magCur = persistent eased state)
@@ -502,11 +513,12 @@ function computeMagnet(t){ const m=fx.magnet;
 
 function computeField(p,boost){ boost=boost||1; const b=buf[p.id]; if(!b)return;
   const lp=live[p.id]||p.nodes.map(n=>d2p(n.x,n.y));
+  const centre=lp.reduce((sum,p)=>[sum[0]+p[0]/lp.length,sum[1]+p[1]/lp.length],[0,0]);
   const S=new Float32Array(lowW*lowH), H=new Float32Array(lowW*lowH);
   const SE=1.8-clamp(fx.curve!=null?fx.curve:0.64,0,1)*1.25;   // global metaball curvature -> spread falloff exponent (0.64 -> 1.0 = prior look)
   p.nodes.forEach((n,j)=>{ const pt=pert[n.id], mg=mag[n.id];
     const ox=(pt?pt.ox:0)+(mg?mg.ox:0), oy=(pt?pt.oy:0)+(mg?mg.oy:0), ssx=pt?pt.sx:1, ssy=pt?pt.sy:1, ni=n.i*(pt?pt.di:1), nf=n.f*(pt?pt.df:1);
-    const px=(lp[j][0]+ox)*scl, py=(lp[j][1]+oy)*scl, Rx=n.r*mfd*ssx*scl, Ry=n.r*mfd*ssy*scl; if(Rx<=0||Ry<=0)return;
+    const px=(lerp(centre[0],lp[j][0],introSpread)+ox)*scl, py=(lerp(centre[1],lp[j][1],introSpread)+oy)*scl, Rx=n.r*mfd*ssx*scl*introRadius, Ry=n.r*mfd*ssy*scl*introRadius; if(Rx<=0||Ry<=0)return;
     const irx2=1/(Rx*Rx), iry2=1/(Ry*Ry);                 // anisotropic (elliptical) falloff -> oblong blobs
     const x0=Math.max(0,Math.floor(px-Rx)),x1=Math.min(lowW,Math.ceil(px+Rx)),y0=Math.max(0,Math.floor(py-Ry)),y1=Math.min(lowH,Math.ceil(py+Ry));
     for(let y=y0;y<y1;y++){const dy=y-py,dy2=dy*dy*iry2,row=y*lowW;
@@ -606,7 +618,7 @@ function render(t){
     window.__cfMs=performance.now()-_tc;
     pl.ctx.clearRect(0,0,cssW,cssH);
     projects.forEach(p=>{ const b=buf[p.id]; if(!b)return;
-      pl.ctx.globalAlpha=clamp(gaCur[p.id]!=null?gaCur[p.id]:1,0,1); pl.ctx.globalCompositeOperation=blendMode; pl.ctx.imageSmoothingEnabled=true; pl.ctx.imageSmoothingQuality='high';
+      pl.ctx.globalAlpha=introReveal*clamp(gaCur[p.id]!=null?gaCur[p.id]:1,0,1); pl.ctx.globalCompositeOperation=blendMode; pl.ctx.imageSmoothingEnabled=true; pl.ctx.imageSmoothingQuality='high';
       pl.ctx.drawImage(b.cv,0,0,lowW,lowH,0,0,cssW,cssH); });
     pl.ctx.globalAlpha=1; pl.ctx.globalCompositeOperation='source-over';
     const _tg=performance.now();
@@ -632,7 +644,7 @@ function render(t){
     maskTexX.setTransform(1,0,0,1,0,0);
     maskTexX.globalCompositeOperation='destination-in'; maskTexX.drawImage(pl.canvas,0,0,gw,gh); maskTexX.globalCompositeOperation='source-over';
     blitUp(maskTexC, dark?'lighten':'overlay', clamp(fx.grain.op,0,1)); }
-  if(mode==='edit'){ if(!globalTab) drawHandles(); } else if(fi){const p=getProj(fi);if(p)drawMarkers(p);}
+  if(mode==='edit'){ if(!globalTab) drawHandles(); } else if(fi&&introReveal>=1){const p=getProj(fi);if(p)drawMarkers(p);}
   requestAnimationFrame(render);
 }
 
@@ -643,7 +655,7 @@ function getNode(){const p=getProj(selProj);if(!p)return null;return p.nodes.fin
 let drag=null; const vhint=document.getElementById('viewHint');
 cv.addEventListener('pointerdown',e=>{ const px=e.clientX,py=e.clientY; mouse.x=px;mouse.y=py;mouse.inside=true;
   if(mode!=='edit'){   // present: click a project blob -> open its case study
-    const best=projectAt(px,py); if(best){ const bp=getProj(best); if(bp&&PAGES[bp.code]) location.href='project.html?p='+encodeURIComponent(PAGES[bp.code]); } return; }
+    const best=projectAt(px,py); if(best){ const bp=getProj(best); if(bp&&PAGES[bp.code]) location.href=MMRoutes.href(PAGES[bp.code]); } return; }
   if(px<fL-20||px>fL+fW+20||py<fT-20||py>fT+fH+20) return;
   const sp=getProj(selProj); if(!sp) return;
   // grab the selected node's label (previewed in edit) and swing it around the node
@@ -805,9 +817,9 @@ function buildLegend(){ const vis=projects.filter(p=>p.code!=='P-07'); legendEl.
     row.innerHTML=`<span class="lg-dot" style="background:${rgbStr(p.colors.core)}"></span><span class="lg-code">${p.code}</span><span class="lg-name">${p.name}</span>`;
     row.onmouseenter=()=>{if(!lock){hover=p.id;syncLegend();updateReadout();}};
     row.onmouseleave=()=>{if(!lock){hover=null;syncLegend();updateReadout();}};
-    row.onclick=()=>{ if(PAGES[p.code]) location.href='project.html?p='+encodeURIComponent(PAGES[p.code]); };
+    row.onclick=()=>{ if(PAGES[p.code]) location.href=MMRoutes.href(PAGES[p.code]); };
     legendEl.appendChild(row);});
-  const ab=document.createElement('a'); ab.className='lg-about'; ab.href='about.html';
+  const ab=document.createElement('a'); ab.className='lg-about'; ab.href=MMRoutes.href('about');
   ab.innerHTML='<span>About the studio</span>';
   legendEl.appendChild(ab); }
 function syncLegend(){const fi=lock||hover;legendEl.querySelectorAll('.lg-row').forEach(r=>{r.classList.toggle('active',r.dataset.id===fi);r.classList.toggle('dim',fi&&r.dataset.id!==fi);});}
@@ -815,7 +827,7 @@ function updateReadout(){const fi=lock||hover;const pv=document.getElementById('
   if(!fi){readoutEl.classList.remove('show');if(pv)pv.classList.remove('show');return;}const p=getProj(fi);if(!p)return;
   if(pv){ const e=PREVIEW[p.code], slug=PAGES[p.code];
     if(e){ pv.querySelector('img').src=e.src; pv.querySelector('.lab').textContent=e.cap||p.name||''; pv.classList.add('show');
-      if(slug){ pv.style.cursor='pointer'; pv.style.pointerEvents='auto'; pv.title='Open case study'; pv.onclick=()=>{ location.href='project.html?p='+slug; }; }
+      if(slug){ pv.style.cursor='pointer'; pv.style.pointerEvents='auto'; pv.title='Open case study'; pv.onclick=()=>{ location.href=MMRoutes.href(slug); }; }
       else { pv.style.cursor=''; pv.style.pointerEvents='none'; pv.removeAttribute('title'); pv.onclick=null; } }
     else pv.classList.remove('show'); }
   let xmin=9,xmax=-9,ymin=9,ymax=-9;p.nodes.forEach(n=>{xmin=Math.min(xmin,n.x);xmax=Math.max(xmax,n.x);ymin=Math.min(ymin,n.y);ymax=Math.max(ymax,n.y);});
@@ -1149,19 +1161,33 @@ function sanitizeProjects(){ projects.forEach(p=>{
     n.r=clamp(num(n.r,0.18),0.03,0.6); n.i=clamp(num(n.i,0.8),0.05,1); n.f=clamp(num(n.f,2),0.5,4);
     n.core=!!n.core; if(n.label==null)n.label=''; n.la=num(n.la,0); }); }); }
 
-/* load "awakening": the field fades in (opacity) while the metaball curvature resolves from merged -> resting; ease-in-out .3s */
+/* Keep the ground and lattice fully visible while only the matter awakens. */
+const landingStarted=performance.now();
 function introAwaken(target){
-  const stage=document.getElementById('stage'), T0=performance.now(), DUR=300, START=0.82;
-  const ez=p=>p<0.5?2*p*p:1-Math.pow(-2*p+2,2)/2;
-  if(stage)stage.style.opacity='0';
-  (function step(now){ const p=clamp((now-T0)/DUR,0,1), e=ez(p);
-    fx.curve=lerp(START,target,e); fxChanged=true; dirty=true; if(stage)stage.style.opacity=String(e);
-    if(p<1) requestAnimationFrame(step); else { fx.curve=target; fxChanged=true; if(stage)stage.style.opacity=''; } })(performance.now());
+  const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const T0=Math.max(performance.now(),landingStarted+560), DUR=1600;
+  document.documentElement.classList.add('field-entering');
+  (function step(now){
+    const p=reduced?1:clamp((now-T0)/DUR,0,1), e=p*p*(3-2*p);
+    introReveal=smoothstep(0,.4,p);
+    // A restrained overshoot makes the growth legible before the field settles.
+    const back=1+2.15*Math.pow(p-1,3)+1.15*Math.pow(p-1,2);
+    introRadius=.06+.94*back; introSpread=.30+.70*e;
+    fx.curve=lerp(.98,target,e); fxChanged=true; dirty=true;
+    if(p<1)requestAnimationFrame(step);
+    else{introRadius=introSpread=introReveal=1;fx.curve=target;document.documentElement.classList.remove('field-entering');}
+  })(performance.now());
 }
+// Paint the ground and grid synchronously, before any remote content request.
+layout(); setMode('present');
+ctx.fillStyle=fx.bg==='black'?'#0A0A0C':'#F3F3F0';ctx.fillRect(0,0,cssW,cssH);
+drawLattice(ctx,fx.bg==='black');drawCross(ctx,fx.bg==='black');
+document.documentElement.classList.add('home-ready');
+MMLogoIntro.play();
 
 /* source of truth: read the roster from Supabase (anon, public-read), fall back to this browser's local state, then the bundled seed */
-async function loadRosterRemote(){ const U='https://vjvjparfulrtsxdslrpg.supabase.co', K='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZqdmpwYXJmdWxydHN4ZHNscnBnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI2ODM1ODIsImV4cCI6MjA5ODI1OTU4Mn0._A1WCuNyCtnJ2Y3U4iqWjvWQe2ANTA6i-sYfuhhcFq4';
-  try{ const res=await fetch(U+'/rest/v1/roster?id=eq.main&select=data',{headers:{apikey:K,Authorization:'Bearer '+K},cache:'no-cache'}); if(res.ok){ const r=await res.json(); if(r.length&&r[0].data) return r[0].data; } }catch(e){} return null; }
+async function loadRosterRemote(){ const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),1800); const U='https://vjvjparfulrtsxdslrpg.supabase.co', K='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZqdmpwYXJmdWxydHN4ZHNscnBnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI2ODM1ODIsImV4cCI6MjA5ODI1OTU4Mn0._A1WCuNyCtnJ2Y3U4iqWjvWQe2ANTA6i-sYfuhhcFq4';
+  try{ const res=await fetch(U+'/rest/v1/roster?id=eq.main&select=data',{signal:controller.signal,headers:{apikey:K,Authorization:'Bearer '+K},cache:'no-cache'}); if(res.ok){ const r=await res.json(); if(r.length&&r[0].data) return r[0].data; } }catch(e){} finally{clearTimeout(timeout);} return null; }
 (async function(){ const saved=(await loadRosterRemote())||(await store.load());
   const sp=Array.isArray(saved)?saved:(saved&&saved.projects?saved.projects:null);   // v1 = bare projects array; v2 = {projects,fx,blend}
   if(saved&&!Array.isArray(saved)){ if(saved.blend)blendMode=saved.blend; if(saved.fx)applyFx(saved.fx); }
@@ -1179,7 +1205,7 @@ async function loadRosterRemote(){ const U='https://vjvjparfulrtsxdslrpg.supabas
   let focused=false;
   try{ const fc=new URLSearchParams(location.search).get('focus');
     if(fc){ const fp=projects.find(x=>x.code===fc); if(fp){ lock=fp.id; hover=fp.id; syncLegend(); updateReadout(); focused=true; } } }catch(e){}
-  if(!focused) introAwaken(0.08);   // only awaken on a fresh landing, not when returning focused to a project
+  if(!focused) introAwaken(fx.curve); else {introReveal=introRadius=introSpread=1;dirty=true;}   // only awaken on a fresh landing, not when returning focused to a project
 })();
 })();
 </script>

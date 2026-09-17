@@ -1,0 +1,8 @@
+# Review the source templates; these copies are verified by build-routes --check.
+65porter/index.html linguist-generated=true
+about/index.html linguist-generated=true
+eyeknow-manor/index.html linguist-generated=true
+gif/index.html linguist-generated=true
+massive/index.html linguist-generated=true
+nightmare-kart/index.html linguist-generated=true
+selected-arcade/index.html linguist-generated=true

@@ -55,7 +55,7 @@
   function renderList(){ if(!root)return;
     const rows=list.map(p=>{ const cur=current&&current===p.slug;
       const tag=cur?'div':'a';
-      const attrs=cur?'class="lg-row cur"':'class="lg-row" href="project.html?p='+esc(p.slug)+'"';
+      const attrs=cur?'class="lg-row cur"':'class="lg-row" href="'+esc(MMRoutes.href(p.slug))+'"';
       return '<'+tag+' '+attrs+'>'
         +'<span class="lg-dot" style="background:'+rgb(p.core)+'"></span>'
         +'<span class="lg-code">'+esc(p.code||'')+'</span>'
@@ -65,7 +65,7 @@
     // consolidate vertical space so long classification lists fit.
     const about = current==='about'
       ? '<div class="lg-alt cur"><span>About the studio</span></div>'
-      : '<a class="lg-alt" href="about.html"><span>About the studio</span></a>';
+      : '<a class="lg-alt" href="'+MMRoutes.href('about')+'"><span>About the studio</span></a>';
     root.innerHTML='<div class="lg-h">Index / '+String(list.length).padStart(2,'0')+'</div>'+rows+about;
   }
   function build(container){ if(root)return; style();
