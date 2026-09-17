@@ -399,7 +399,7 @@ function updateUndoUI(){const u=document.getElementById('undoBtn'),r=document.ge
 const cv=document.getElementById('field'), ctx=cv.getContext('2d');
 let DPR=1,cssW=0,cssH=0,fL,fT,fW,fH,mfd,lowW,lowH,scl;
 const buf={}; let pl={canvas:null,ctx:null}; let alpha={}; let live={}; let dirty=true, lastField=0; let heightBuf=null;
-let introReveal=0,introRadius=.06,introSpread=.30;
+let introReveal=0,introRadius=.06;
 let pert={}; const ANIM_FPS=26;   // per-node render-time animation deltas (not persisted) + field recompute throttle while animating
 let gaCur={}, boostCur={}, lastT=0, globalTab=false, dragFrom=null;   // focus-fade easing (per-project alpha+boost), GLOBAL-tab flag, project drag-reorder index
 let mag={}, magCur={}, lastMagT=0, magWasActive=false;   // cursor-magnet eased per-node pull offsets (magCur = persistent eased state)
@@ -513,12 +513,11 @@ function computeMagnet(t){ const m=fx.magnet;
 
 function computeField(p,boost){ boost=boost||1; const b=buf[p.id]; if(!b)return;
   const lp=live[p.id]||p.nodes.map(n=>d2p(n.x,n.y));
-  const centre=lp.reduce((sum,p)=>[sum[0]+p[0]/lp.length,sum[1]+p[1]/lp.length],[0,0]);
   const S=new Float32Array(lowW*lowH), H=new Float32Array(lowW*lowH);
   const SE=1.8-clamp(fx.curve!=null?fx.curve:0.64,0,1)*1.25;   // global metaball curvature -> spread falloff exponent (0.64 -> 1.0 = prior look)
   p.nodes.forEach((n,j)=>{ const pt=pert[n.id], mg=mag[n.id];
     const ox=(pt?pt.ox:0)+(mg?mg.ox:0), oy=(pt?pt.oy:0)+(mg?mg.oy:0), ssx=pt?pt.sx:1, ssy=pt?pt.sy:1, ni=n.i*(pt?pt.di:1), nf=n.f*(pt?pt.df:1);
-    const px=(lerp(centre[0],lp[j][0],introSpread)+ox)*scl, py=(lerp(centre[1],lp[j][1],introSpread)+oy)*scl, Rx=n.r*mfd*ssx*scl*introRadius, Ry=n.r*mfd*ssy*scl*introRadius; if(Rx<=0||Ry<=0)return;
+    const px=(lp[j][0]+ox)*scl, py=(lp[j][1]+oy)*scl, Rx=n.r*mfd*ssx*scl*introRadius, Ry=n.r*mfd*ssy*scl*introRadius; if(Rx<=0||Ry<=0)return;
     const irx2=1/(Rx*Rx), iry2=1/(Ry*Ry);                 // anisotropic (elliptical) falloff -> oblong blobs
     const x0=Math.max(0,Math.floor(px-Rx)),x1=Math.min(lowW,Math.ceil(px+Rx)),y0=Math.max(0,Math.floor(py-Ry)),y1=Math.min(lowH,Math.ceil(py+Ry));
     for(let y=y0;y<y1;y++){const dy=y-py,dy2=dy*dy*iry2,row=y*lowW;
@@ -1172,10 +1171,10 @@ function introAwaken(target){
     introReveal=smoothstep(0,.4,p);
     // A restrained overshoot makes the growth legible before the field settles.
     const back=1+2.15*Math.pow(p-1,3)+1.15*Math.pow(p-1,2);
-    introRadius=.06+.94*back; introSpread=.30+.70*e;
+    introRadius=.06+.94*back;
     fx.curve=lerp(.98,target,e); fxChanged=true; dirty=true;
     if(p<1)requestAnimationFrame(step);
-    else{introRadius=introSpread=introReveal=1;fx.curve=target;document.documentElement.classList.remove('field-entering');}
+    else{introRadius=introReveal=1;fx.curve=target;document.documentElement.classList.remove('field-entering');}
   })(performance.now());
 }
 // Paint the ground and grid synchronously, before any remote content request.
@@ -1205,7 +1204,7 @@ async function loadRosterRemote(){ const controller=new AbortController(),timeou
   let focused=false;
   try{ const fc=new URLSearchParams(location.search).get('focus');
     if(fc){ const fp=projects.find(x=>x.code===fc); if(fp){ lock=fp.id; hover=fp.id; syncLegend(); updateReadout(); focused=true; } } }catch(e){}
-  if(!focused) introAwaken(fx.curve); else {introReveal=introRadius=introSpread=1;dirty=true;}   // only awaken on a fresh landing, not when returning focused to a project
+  if(!focused) introAwaken(fx.curve); else {introReveal=introRadius=1;dirty=true;}   // only awaken on a fresh landing, not when returning focused to a project
 })();
 })();
 </script>

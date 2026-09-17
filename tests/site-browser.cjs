@@ -36,13 +36,13 @@ const out=path.resolve(__dirname,'../../site-validation');fs.mkdirSync(out,{recu
  console.log('All six clean project URLs return 200, select correct content, and survive refresh.');
  await page.goto(base+'/project.html?p=eyeknow-manor');await page.locator('.ident .name').waitFor();assert.equal(new URL(page.url()).pathname,'/eyeknow-manor');assert.equal(new URL(page.url()).search,'');
  await page.setViewportSize({width:2560,height:1440});
- assert.equal(await page.locator('.stage').evaluate(e=>e.getBoundingClientRect().width),1280);
+ assert.equal(await page.locator('.stage').evaluate(e=>e.getBoundingClientRect().width),1440);
  await page.evaluate(()=>scrollTo(0,900));await page.waitForTimeout(700);
  const gaps=await page.evaluate(()=>{const r=s=>document.querySelector(s).getBoundingClientRect();return {above:r('.ident .name').top-r('.wordmark').bottom,below:r('.nav').top-r('.ident .name').bottom};});
  assert(Math.abs(gaps.above-gaps.below)<1,JSON.stringify(gaps));assert(gaps.above>=23);
  await page.screenshot({path:path.join(out,'project-wide-scrolled.png')});
  await page.locator('.wordmark').click();await page.waitForURL(base+'/');
- console.log('Legacy project URL canonicalizes; 1280px cap, equal title gaps, and home logo navigation pass.');
+ console.log('Legacy project URL canonicalizes; 1440px cap, equal title gaps, and home logo navigation pass.');
  await page.setViewportSize({width:1440,height:1000});
  await page.goto(base+'/about');await page.waitForTimeout(1200);
  assert.equal(new URL(page.url()).pathname,'/about');
