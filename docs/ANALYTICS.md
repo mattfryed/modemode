@@ -9,7 +9,7 @@ Measurement ID: `G-39B1KGZ9N4`.
 | project_open | Open a project using a homepage cluster, index, or preview | project_slug, navigation_source |
 | project_section_select | Select a project's section using navigation, field, minimap, or preview | project_slug, section_name, navigation_source |
 | project_detail_open | Open a content image in its lightbox | project_slug, section_name, navigation_source |
-| contact_click | Click the About email link (matt@modemode.studio) | project_slug when applicable, navigation_source |
+| contact_click | Click the About email link (hello@modemode.studio) | project_slug when applicable, navigation_source |
 
 Only explicit interactions are tracked. Scrolling, hover, animation frames, and automatic section highlighting do not emit these custom events.
 
@@ -21,7 +21,7 @@ The shared loader only enables GA on modemode.studio and www.modemode.studio. Lo
 - Event retention changed from 2 to 14 months. User retention was already 14 months.
 - Event-scoped custom dimensions created: Project (`project_slug`), Project section (`section_name`), Navigation source (`navigation_source`).
 - Home / studio rule marks the current public IPv4 and this computer's IPv6 address as internal. The Internal Traffic exclusion filter remains in Testing mode: it labels matching traffic without excluding it yet. Addresses may change; update the rule after a network change. The IP values are stored only in GA, not in this repository.
-- `contact_click` is registered as a key event, counted once per session with no default monetary value. The About link points to matt@modemode.studio.
+- `contact_click` is registered as a key event, counted once per session with no default monetary value. The About link points to hello@modemode.studio.
 - Site event instrumentation goes live only after the code PR is merged and deployed.
 
 ## Campaign links
