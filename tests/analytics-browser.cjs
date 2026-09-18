@@ -48,14 +48,14 @@ const root=path.resolve(__dirname,'..');
  await page.goto('https://modemode.studio/about');
  const contact=page.locator('#copy .contact a');
  await contact.waitFor();
- assert.equal(await contact.getAttribute('href'),'mailto:matt@modemode.studio');
+ assert.equal(await contact.getAttribute('href'),'mailto:hello@modemode.studio');
  // Let the real delegated listener run, then cancel the mail-client default action.
  await page.evaluate(()=>document.addEventListener('click',e=>e.preventDefault()));
  await contact.dispatchEvent('click',{button:0,ctrlKey:true,bubbles:true,cancelable:true});
  await page.waitForTimeout(100);
  const contacts=events.filter(e=>e[1]==='contact_click');
  assert.equal(contacts.length,1);assert.equal(contacts[0][2].navigation_source,'about');
- assert.ok(!JSON.stringify(contacts).includes('matt@'));
+ assert.ok(!JSON.stringify(contacts).includes('@modemode.studio'));
  for(const width of [1440,390]){
    await page.setViewportSize({width,height:900});
    await contact.scrollIntoViewIfNeeded();

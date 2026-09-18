@@ -212,7 +212,7 @@
     const lede=(EDIT||a.lede)?`<h1 class="lede"${ea('lede')}>${escHTML(a.lede||'')}</h1>`:'';
     const body=(EDIT||a.body)?`<div class="body"${ea('body')}>${paras(a.body||'')}</div>`:'';
     const meta=(EDIT||a.meta)?`<div class="meta"${ea('meta')}>${lines(a.meta||'')}</div>`:'';
-    const contact='<p class="contact"><a href="mailto:matt@modemode.studio">Get in touch — matt@modemode.studio</a></p>';
+    const contact='<p class="contact"><a href="mailto:hello@modemode.studio">Get in touch — hello@modemode.studio</a></p>';
     host.innerHTML=kicker+lede+body+contact+meta;
   }
   async function loadAboutDoc(){
