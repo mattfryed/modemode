@@ -10,14 +10,7 @@
 <meta name="color-scheme" content="light">
 <link rel="icon" href="data:,">
 <title>About — MODE MODE</title>
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-39B1KGZ9N4"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'G-39B1KGZ9N4');
-</script>
+<script src="assets/mm-analytics.js"></script>
 <style>
   @font-face{font-family:'BB Strata Pro';src:url('assets/fonts/BBStrataProSEF-Bold.woff2') format('woff2'),
     url('assets/fonts/BBStrataProSEF-Bold.ttf') format('truetype');font-weight:700;font-style:normal;font-display:swap;}
@@ -82,6 +75,8 @@
     .wordmark{width:78px;top:24px;left:24px;} .wordmark img{width:78px;}
     .home{top:28px;right:24px;}
   }
+  #copy .contact{font-size:13px;line-height:1.6;margin:24px 0;}
+  #copy .contact a{color:var(--ink);text-underline-offset:4px;}
 </style>
 </head>
 <body>
@@ -217,7 +212,8 @@
     const lede=(EDIT||a.lede)?`<h1 class="lede"${ea('lede')}>${escHTML(a.lede||'')}</h1>`:'';
     const body=(EDIT||a.body)?`<div class="body"${ea('body')}>${paras(a.body||'')}</div>`:'';
     const meta=(EDIT||a.meta)?`<div class="meta"${ea('meta')}>${lines(a.meta||'')}</div>`:'';
-    host.innerHTML=kicker+lede+body+meta;
+    const contact='<p class="contact"><a href="mailto:matt@modemode.studio">Get in touch — matt@modemode.studio</a></p>';
+    host.innerHTML=kicker+lede+body+contact+meta;
   }
   async function loadAboutDoc(){
     try{

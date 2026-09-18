@@ -6,14 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
 <title>MODE MODE — Field Studio</title>
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-39B1KGZ9N4"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'G-39B1KGZ9N4');
-</script>
+<script src="assets/mm-analytics.js"></script>
 <script>document.documentElement.classList.add('home-boot','logo-waiting');</script>
 <script src="assets/mm-logo-intro.js"></script>
 <style>
@@ -662,7 +655,7 @@ function getNode(){const p=getProj(selProj);if(!p)return null;return p.nodes.fin
 let drag=null; const vhint=document.getElementById('viewHint');
 cv.addEventListener('pointerdown',e=>{ const px=e.clientX,py=e.clientY; mouse.x=px;mouse.y=py;mouse.inside=true;
   if(mode!=='edit'){   // present: click a project blob -> open its case study
-    const best=projectAt(px,py); if(best){ const bp=getProj(best); if(bp&&PAGES[bp.code]) location.href=MMRoutes.href(PAGES[bp.code]); } return; }
+    const best=projectAt(px,py); if(best){ const bp=getProj(best); if(bp&&PAGES[bp.code]) MMAnalytics.openProject(PAGES[bp.code],'field'); } return; }
   if(px<fL-20||px>fL+fW+20||py<fT-20||py>fT+fH+20) return;
   const sp=getProj(selProj); if(!sp) return;
   // grab the selected node's label (previewed in edit) and swing it around the node
@@ -824,7 +817,7 @@ function buildLegend(){ const vis=projects.filter(p=>p.code!=='P-07'); legendEl.
     row.innerHTML=`<span class="lg-dot" style="background:${rgbStr(p.colors.core)}"></span><span class="lg-code">${p.code}</span><span class="lg-name">${p.name}</span>`;
     row.onmouseenter=()=>{if(!lock){hover=p.id;syncLegend();updateReadout();}};
     row.onmouseleave=()=>{if(!lock){hover=null;syncLegend();updateReadout();}};
-    row.onclick=()=>{ if(PAGES[p.code]) location.href=MMRoutes.href(PAGES[p.code]); };
+    row.onclick=()=>{ if(PAGES[p.code]) MMAnalytics.openProject(PAGES[p.code],'index'); };
     legendEl.appendChild(row);});
   const ab=document.createElement('a'); ab.className='lg-about'; ab.href=MMRoutes.href('about');
   ab.innerHTML='<span>About the studio</span>';
@@ -834,7 +827,7 @@ function updateReadout(){const fi=lock||hover;const pv=document.getElementById('
   if(!fi){readoutEl.classList.remove('show');if(pv)pv.classList.remove('show');return;}const p=getProj(fi);if(!p)return;
   if(pv){ const e=PREVIEW[p.code], slug=PAGES[p.code];
     if(e){ pv.querySelector('img').src=e.src; pv.querySelector('.lab').textContent=e.cap||p.name||''; pv.classList.add('show');
-      if(slug){ pv.style.cursor='pointer'; pv.style.pointerEvents='auto'; pv.title='Open case study'; pv.onclick=()=>{ location.href=MMRoutes.href(slug); }; }
+      if(slug){ pv.style.cursor='pointer'; pv.style.pointerEvents='auto'; pv.title='Open case study'; pv.onclick=()=>{ MMAnalytics.openProject(slug,'preview'); }; }
       else { pv.style.cursor=''; pv.style.pointerEvents='none'; pv.removeAttribute('title'); pv.onclick=null; } }
     else pv.classList.remove('show'); }
   let xmin=9,xmax=-9,ymin=9,ymax=-9;p.nodes.forEach(n=>{xmin=Math.min(xmin,n.x);xmax=Math.max(xmax,n.x);ymin=Math.min(ymin,n.y);ymax=Math.max(ymax,n.y);});
