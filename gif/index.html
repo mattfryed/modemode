@@ -9,14 +9,7 @@
 <meta name="color-scheme" content="light">
 <link rel="icon" href="data:,">
 <title>MODE MODE — Project</title>
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-39B1KGZ9N4"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'G-39B1KGZ9N4');
-</script>
+<script src="assets/mm-analytics.js"></script>
 <style>
   @font-face{font-family:'BB Strata Pro';src:url('assets/fonts/BBStrataProSEF-Bold.woff2') format('woff2'),
     url('assets/fonts/BBStrataProSEF-Bold.ttf') format('truetype');font-weight:700;font-style:normal;font-display:swap;}
@@ -552,7 +545,7 @@ function bindField(cv){
   cv.addEventListener('pointermove',e=>{ const id=pick(e); if(id!==state.hoverNodeId){ state.hoverNodeId=id; syncNavHover();
     const n=id&&state.nodes.find(x=>x.id===id); cv.style.cursor=(n&&hasContent(n))?'pointer':'default'; } });
   cv.addEventListener('pointerleave',()=>{ if(state.hoverNodeId){ state.hoverNodeId=null; syncNavHover(); } });
-  cv.addEventListener('click',()=>{ const id=state.hoverNodeId, n=id&&state.nodes.find(x=>x.id===id); if(n&&hasContent(n)) scrollToSection(id); });
+  cv.addEventListener('click',()=>{ const id=state.hoverNodeId, n=id&&state.nodes.find(x=>x.id===id); if(n&&hasContent(n)) scrollToSection(id,'field'); });
 }
 
 const state={ project:null, nodes:[], contentNodes:[], accent:[196,0,33], ink:[196,0,33], mm:null, hoverNodeId:null, activeKey:'classification', imgN:0 };
@@ -752,11 +745,14 @@ function bindMinimap(){ const cv=document.getElementById('minimap');
   cv.addEventListener('pointermove',e=>{ const m=pick(e); const id=m?m.id:null;
     if(id!==state.hoverNodeId){ state.hoverNodeId=id; drawMinimap(); updatePortrait(); cv.style.cursor=(m&&m.live)?'pointer':'default'; } });
   cv.addEventListener('pointerleave',()=>{ if(state.hoverNodeId){state.hoverNodeId=null;drawMinimap();updatePortrait();} });
-  cv.addEventListener('click',e=>{ const m=pick(e); if(m&&m.live) scrollToSection(m.id); });
+  cv.addEventListener('click',e=>{ const m=pick(e); if(m&&m.live) scrollToSection(m.id,'minimap'); });
 }
 
 /* ===================== nav + portrait ===================== */
-function scrollToSection(key){ const t=document.querySelector(`.card[data-section="${key}"]`);
+function scrollToSection(key,source='section_nav'){
+  const node=state.nodes.find(n=>n.id===key);
+  if(!EDIT) MMAnalytics.track('project_section_select',{project_slug:getSlug(),section_name:node?node.label:'Classification',navigation_source:source});
+  const t=document.querySelector(`.card[data-section="${key}"]`);
   if(t) t.scrollIntoView({behavior:'smooth',block:'start'}); }
 function setActiveKey(key){ if(state.activeKey===key)return; state.activeKey=key;
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.key===key)); }
@@ -768,7 +764,7 @@ function updatePortrait(){
   const live=hasContent(n);
   elp.innerHTML=`<div class="p-lab">${esc(n.label)}</div>`+(n.blurb?`<div class="p-blurb">${esc(n.blurb)}</div>`:'')+
     `<div class="p-status ${live?'live':'idle'}">${live?'Case study — open ▸':'Mapped · no case study yet'}</div>`;
-  if(live){ const st=elp.querySelector('.p-status.live'); if(st) st.addEventListener('click',()=>scrollToSection(n.id)); }
+  if(live){ const st=elp.querySelector('.p-status.live'); if(st) st.addEventListener('click',()=>scrollToSection(n.id,'preview')); }
   elp.classList.add('on');
 }
 
@@ -873,7 +869,10 @@ let _rz=null; window.addEventListener('resize',()=>{ clearTimeout(_rz); _rz=setT
   lb.addEventListener('click',close);
   document.addEventListener('keydown',e=>{ if(e.key==='Escape')close(); });
   document.addEventListener('click',e=>{ if(EDIT)return; const img=e.target.closest('img'); if(!img||!img.closest('.main'))return; const s=img.getAttribute('src'); if(!s)return;
-    lb.querySelector('img').src=s; lb.querySelector('img').alt=img.getAttribute('alt')||''; lb.classList.add('on'); });
+    lb.querySelector('img').src=s; lb.querySelector('img').alt=img.getAttribute('alt')||''; lb.classList.add('on');
+    const key=img.closest('[data-section]')?.dataset.section||'classification';
+    const node=state.nodes.find(n=>n.id===key);
+    MMAnalytics.track('project_detail_open',{project_slug:getSlug(),section_name:node?node.label:'Classification',navigation_source:'image'}); });
 })();
 /* ── inline-edit layer — the editor's Canvas tab drives this over postMessage (gated by ?edit) ── */
 let DOC=null, _postT=null;

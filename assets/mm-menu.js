@@ -55,7 +55,7 @@
   function renderList(){ if(!root)return;
     const rows=list.map(p=>{ const cur=current&&current===p.slug;
       const tag=cur?'div':'a';
-      const attrs=cur?'class="lg-row cur"':'class="lg-row" href="'+esc(MMRoutes.href(p.slug))+'"';
+      const attrs=cur?'class="lg-row cur"':'class="lg-row" data-mm-project="'+esc(p.slug)+'" href="'+esc(MMRoutes.href(p.slug))+'"';
       return '<'+tag+' '+attrs+'>'
         +'<span class="lg-dot" style="background:'+rgb(p.core)+'"></span>'
         +'<span class="lg-code">'+esc(p.code||'')+'</span>'
