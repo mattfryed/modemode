@@ -3,12 +3,33 @@
 <head>
 <meta charset="UTF-8">
 <script src="assets/mm-routes.js"></script>
+<script>document.documentElement.classList.add('mm-js');</script>
+<script src="assets/mm-stills.js"></script>
+<script src="assets/mm-motion.js"></script>
 <script src="assets/mm-about-motion.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
 <link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="icon" type="image/svg+xml" href="favicon.svg" sizes="any">
+<!-- mm-meta:start -->
 <title>About — MODE MODE</title>
+<meta name="description" content="A Brooklyn studio working across creative technology, experiential design, fabrication, art, and play.">
+<link rel="canonical" href="https://modemode.studio/about">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="MODE MODE">
+<meta property="og:title" content="About — MODE MODE">
+<meta property="og:description" content="A Brooklyn studio working across creative technology, experiential design, fabrication, art, and play.">
+<meta property="og:url" content="https://modemode.studio/about">
+<meta property="og:image" content="https://modemode.studio/assets/share/mode-mode.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="MODE MODE — creative technology, design, fabrication, art, and play">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="About — MODE MODE">
+<meta name="twitter:description" content="A Brooklyn studio working across creative technology, experiential design, fabrication, art, and play.">
+<meta name="twitter:image" content="https://modemode.studio/assets/share/mode-mode.jpg">
+<meta name="twitter:image:alt" content="MODE MODE — creative technology, design, fabrication, art, and play">
+<!-- mm-meta:end -->
 <script src="assets/mm-analytics.js"></script>
 <style>
   @font-face{font-family:'BB Strata Pro';src:url('assets/fonts/BBStrataProSEF-Bold.woff2') format('woff2'),
@@ -77,6 +98,7 @@
   #copy .contact{font-size:13px;line-height:1.6;margin:24px 0;}
   #copy .contact a{color:var(--ink);text-underline-offset:4px;}
 </style>
+<link rel="stylesheet" href="assets/mm-accessibility.css">
 </head>
 <body>
   <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
@@ -86,7 +108,7 @@
   </a>
 <main class="plate">
   <section class="notes">
-    <div id="copy"></div>
+    <div id="copy"><!-- mm-about:start --><div class="kicker">MODE MODE — ABOUT</div><h1 class="lede">Strange and beautiful things emerge where disciplines lose their edges</h1><div class="body"><p>MODE MODE is a studio working between/across/within the nodes creative technology, experiential design, fabrication, visual systems, art, and play.</p><p>We enjoy creating in all scales from focused, intricate experiences to large, inter-disciplinary projects.</p></div><p class="contact"><a href="mailto:hello@modemode.studio">Get in touch — hello@modemode.studio</a></p><div class="meta">BROOKLYN, NEW YORK<br>CREATIVE / DESIGN / TECH / FABRICATION STUDIO</div><!-- mm-about:end --></div>
     <div id="site-index"></div>
   </section>
   <section class="figure" id="stage" aria-label="A morphing wireframe vessel with drifting matter fields inside">
@@ -224,7 +246,7 @@
     return DEFAULT_COPY;
   }
   // Paint the default copy immediately so nothing flashes empty, then swap.
-  renderCopy(DEFAULT_COPY);
+  if(!document.getElementById('copy').children.length)renderCopy(DEFAULT_COPY);
   let pendingFigure=null;
   /* ── canvas doc state (edit only) — mirrors project.html's DOC/postDoc. ── */
   let DOC=null,_postT=null,_gotDoc=false;
@@ -749,13 +771,13 @@
     driversReady=true;
   }
 
-  let cssW=1,cssH=1;
+  let cssW=1,cssH=1,frameDirty=true;
   function resize(){
     const r=canvas.getBoundingClientRect();cssW=Math.max(1,r.width);cssH=Math.max(1,r.height);
     const dpr=Math.min(devicePixelRatio||1,1.25),maxPx=1_050_000;
     const scale=Math.min(1,Math.sqrt(maxPx/(cssW*cssH*dpr*dpr)));
     const w=Math.max(2,Math.round(cssW*dpr*scale)),h=Math.max(2,Math.round(cssH*dpr*scale));
-    if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;gl.viewport(0,0,w,h);}
+    if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;gl.viewport(0,0,w,h);frameDirty=true;}
   }
   addEventListener('resize',resize,{passive:true});resize();
 
@@ -791,6 +813,7 @@
   // applyFigureConfig() lets the CMS-authored `figure` block override defaults
   // once the Supabase doc has loaded. Called after loadAboutDoc() resolves.
   function applyFigureConfig(){
+    frameDirty=true;
     if(!pendingFigure) return;
     const cfg=normalizeConfig(Object.assign({}, DEFAULT_CONFIG, pendingFigure));
     // Merge into the live config (palette + states + motion).
@@ -947,14 +970,17 @@
   let initial=Math.max(0,Math.min(NAMES.length-1,Number(params.get('form'))||0));
   let a=initial,b=initial,morph=0,transitioning=false,tStart=0,lastRest=performance.now(),manualUntil=0;
   const forcedStill=params.get('still')==='1';
-  const reduced=forcedStill||matchMedia('(prefers-reduced-motion: reduce)').matches || (M&&M.reduced&&M.reduced());
+  const isReduced=()=>forcedStill||MMMotion.reduced||!!(M&&M.reduced&&M.reduced());
+  MMMotion.subscribe(()=>{frameDirty=true;lastRest=performance.now();});
   const ease=t=>{t=Math.max(0,Math.min(1,t));return t*t*t*(t*(t*6-15)+10);};
   function go(to,manual=true){
+    frameDirty=true;
     to=(to+NAMES.length)%NAMES.length;
     if(transitioning){a=morph<.5?a:b;}
     else a=b;
     if(to===a){b=a;morph=0;transitioning=false;updateUI();return;}
     b=to;morph=0;transitioning=true;tStart=performance.now();
+    if(isReduced()){a=b;transitioning=false;lastRest=performance.now();}
     if(manual)manualUntil=performance.now()+3000;
     updateUI();
   }
@@ -964,7 +990,7 @@
   let pitch=Number.isFinite(Number(params.get('pitch')))?Number(params.get('pitch')):-.36;
   let drag=false,px=0,py=0,moved=0;
   canvas.addEventListener('pointerdown',e=>{drag=true;moved=0;px=e.clientX;py=e.clientY;canvas.setPointerCapture(e.pointerId);canvas.classList.add('dragging');manualUntil=performance.now()+4000;});
-  canvas.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-px,dy=e.clientY-py;px=e.clientX;py=e.clientY;moved+=Math.abs(dx)+Math.abs(dy);yaw+=dx*.006;pitch=Math.max(-1.05,Math.min(.45,pitch+dy*.005));});
+  canvas.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-px,dy=e.clientY-py;px=e.clientX;py=e.clientY;moved+=Math.abs(dx)+Math.abs(dy);frameDirty=true;yaw+=dx*.006;pitch=Math.max(-1.05,Math.min(.45,pitch+dy*.005));});
   canvas.addEventListener('pointerup',e=>{if(!drag)return;drag=false;canvas.classList.remove('dragging');try{canvas.releasePointerCapture(e.pointerId);}catch(_){}if(moved<7)go((transitioning?b:a)+1,true);});
   canvas.addEventListener('pointercancel',()=>{drag=false;canvas.classList.remove('dragging');});
   addEventListener('keydown',e=>{
@@ -978,15 +1004,17 @@
   let origin=performance.now(),lastFrame=0,shellClock=0;
   function frame(now){
     requestAnimationFrame(frame);
-    if(document.hidden)return;
+    if(!MMMotion.visible(canvas))return;
+    const reduced=isReduced();
+    if(reduced&&!frameDirty&&!transitioning)return;
     if(now-lastFrame<1000/30)return;
     const dt=lastFrame?Math.min(.10,(now-lastFrame)/1000):1/30;lastFrame=now;
-    resize();
+    resize();frameDirty=false;
     if(transitioning){
-      const dur=reduced?1:5200/Math.max(.05,transitionSpeed),p=(now-tStart)/dur;morph=ease(p);
+      const dur=5200/Math.max(.05,transitionSpeed),p=reduced?1:(now-tStart)/dur;morph=ease(p);
       if(p>=1){a=b;morph=0;transitioning=false;lastRest=now;updateUI();}
     }else if(!reduced&&now>manualUntil&&now-lastRest>restSeconds*1000)go((a+1)%NAMES.length,false);
-    focus+=(focusTarget-focus)*.10;
+    focus+=(focusTarget-focus)*(reduced?1:.10);
     const t=reduced?0:(now-origin)/1000;
     updateDrivers(t,dt,reduced);
     const bodyData=bodyMotion.update({time:t,from:a,to:b,morph,activity:reduced?0:activity,spread,drivers:matterDrivers,delta:layoutDelta});

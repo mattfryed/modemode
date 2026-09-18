@@ -29,7 +29,7 @@ window.MMLogoIntro = {
         const tick = now => {
           if (!html.classList.contains('logo-waiting')) { canvas.remove(); return; }
           const p = Math.max(0, Math.min(1, (now - t0) / duration));
-          if (p >= 1) { clearTimeout(fallback); finish(); return; }
+          if (p >= 1 || matchMedia('(prefers-reduced-motion: reduce)').matches) { clearTimeout(fallback); finish(); return; }
           const growth = p * p * (3 - 2 * p);
           const color = getComputedStyle(svg).color.match(/[\d.]+/g) || [22, 22, 15];
           for (let i = 0; i < source.length; i += 4) {

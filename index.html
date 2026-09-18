@@ -3,11 +3,32 @@
 <head>
 <meta charset="UTF-8">
 <script src="assets/mm-routes.js"></script>
+<script>document.documentElement.classList.add('mm-js');</script>
+<script src="assets/mm-stills.js"></script>
+<script src="assets/mm-motion.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
 <link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="icon" type="image/svg+xml" href="favicon.svg" sizes="any">
-<title>MODE MODE — Field Studio</title>
+<!-- mm-meta:start -->
+<title>MODE MODE — Creative Technology &amp; Design</title>
+<meta name="description" content="Creative technology, experiential design, fabrication, art, and play. A studio in Brooklyn.">
+<link rel="canonical" href="https://modemode.studio/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="MODE MODE">
+<meta property="og:title" content="MODE MODE — Creative Technology &amp; Design">
+<meta property="og:description" content="Creative technology, experiential design, fabrication, art, and play. A studio in Brooklyn.">
+<meta property="og:url" content="https://modemode.studio/">
+<meta property="og:image" content="https://modemode.studio/assets/share/mode-mode.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="MODE MODE — creative technology, design, fabrication, art, and play">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="MODE MODE — Creative Technology &amp; Design">
+<meta name="twitter:description" content="Creative technology, experiential design, fabrication, art, and play. A studio in Brooklyn.">
+<meta name="twitter:image" content="https://modemode.studio/assets/share/mode-mode.jpg">
+<meta name="twitter:image:alt" content="MODE MODE — creative technology, design, fabrication, art, and play">
+<!-- mm-meta:end -->
 <script src="assets/mm-analytics.js"></script>
 <script>document.documentElement.classList.add('home-boot','logo-waiting');</script>
 <script src="assets/mm-logo-intro.js"></script>
@@ -211,8 +232,10 @@
   body.darkbg .readout{background:#131318;border-color:#2C2C32;}
   body.darkbg .readout .r-name{color:#EDEDE8;} body.darkbg .readout .r-code,body.darkbg .readout .r-row span:first-child{color:#8A8A84;} body.darkbg .readout .r-row{color:#D0D0CA;border-color:#26262C;}
 </style>
+<link rel="stylesheet" href="assets/mm-accessibility.css">
 </head>
 <body class="present">
+<!-- mm-content:start --><section class="page-fallback"><a href="https://modemode.studio/">MODE MODE</a><h1>MODE MODE</h1><p>Creative technology, experiential design, fabrication, art, and play. A studio in Brooklyn.</p><nav aria-label="Project index"><ul><li><a href="https://modemode.studio/65porter">65 PORTER</a></li><li><a href="https://modemode.studio/about">About</a></li><li><a href="https://modemode.studio/eyeknow-manor">EYEKNOW MANOR</a></li><li><a href="https://modemode.studio/gif">GIF</a></li><li><a href="https://modemode.studio/massive">MASSIVE</a></li><li><a href="https://modemode.studio/nightmare-kart">NIGHTMARE KART</a></li><li><a href="https://modemode.studio/selected-arcade">SELECTED ARCADE</a></li></ul></nav><p><a href="mailto:hello@modemode.studio">Get in touch — hello@modemode.studio</a></p></section><!-- mm-content:end -->
 <script>if(new URLSearchParams(location.search).has('studio'))document.body.classList.add('studio');</script>
 <div id="stage">
   <canvas id="field"></canvas>
@@ -478,7 +501,7 @@ function nodeSeeds(id){ let s=_seedCache[id]; if(s)return s;
   _seedCache[id]=s; return s; }
 /* smooth 1-D value noise in time for the random walk (reuses hsh, declared below) */
 function tnoise(seed,x){ const xi=Math.floor(x), xf=x-xi, u=xf*xf*(3-2*xf); return hsh(seed,xi)*(1-u)+hsh(seed,xi+1)*u; }
-function animEnabled(){ const a=fx.anim; return !!(a&&a.on) && a.amount>0.001 && !drag; }
+function animEnabled(){ const a=fx.anim; return !MMMotion.reduced && !!(a&&a.on) && a.amount>0.001 && !drag; }
 function nodePert(n,t){ const A=fx.anim, s=nodeSeeds(n.id), m=A.amount, va=lerp(1,s.av,A.variance), T=t*0.001*A.speed;
   const wx=(tnoise(s.wx,T*0.6*s.fw)-0.5)*2, wy=(tnoise(s.wy,T*0.6*s.fh)-0.5)*2, wamp=A.walk*m*va*mfd;
   const bw=Math.sin(T*1.6*s.fw+s.phw), bh=Math.sin(T*1.35*s.fh+s.phh), bamp=A.breathe*m*va;
@@ -492,6 +515,7 @@ function computePert(t){ pert={}; if(!animEnabled())return; projects.forEach(p=>
    it never overshoots the cursor. Moving the field naturally shifts colour too (the enticing part). Returns whether
    any node is affected so the render loop knows to recompute. */
 function computeMagnet(t){ const m=fx.magnet;
+  if(MMMotion.reduced){mag={};magCur={};return false;}
   const active=!!(m&&m.on)&&!drag&&mouse.inside;
   const targets={};
   if(active){ const R=m.radius, R2=R*R, str=clamp(m.strength,0,1), MAX=R*0.20;
@@ -583,7 +607,12 @@ function drawMarkers(p){const lp=live[p.id];const core=p.colors.core;const deep=
     ctx.beginPath();ctx.arc(x,y,1.5,0,6.283);ctx.fillStyle=deep;ctx.fill();
     drawNodeLabel(n,x,y,core);});}
 
+MMMotion.subscribe(()=>{dirty=true;fxChanged=true;});
 function render(t){
+  requestAnimationFrame(render);
+  if(!MMMotion.visible(cv))return;
+  const reduced=MMMotion.reduced;
+  if(reduced)t=0;
   computeLive();
   let fi=null;
   if(mode==='present'){
@@ -598,7 +627,7 @@ function render(t){
   // ---- ease each project's composite alpha + intensity boost toward target (smooth hover de-intensify, no snap) ----
   const dimA=clamp(fx.unfocus!=null?fx.unfocus:0.4,0,1);   // opacity unfocused projects fade to (lower = fainter)
   const dt=Math.min(0.05,(lastT?(t-lastT):0)/1000); lastT=t;
-  const tau=Math.max(0.001,fx.hoverFade!=null?fx.hoverFade:0.15), kEase=1-Math.exp(-dt/tau);
+  const tau=Math.max(0.001,fx.hoverFade!=null?fx.hoverFade:0.15), kEase=reduced?1:1-Math.exp(-dt/tau);
   let easing=false;
   projects.forEach(p=>{ let tgA,tgB;
     if(mode==='edit'){ tgA=globalTab?1:(p.id===selProj?1:0.45); tgB=1; }   // GLOBAL tab: every project equal, nothing focused
@@ -630,24 +659,24 @@ function render(t){
     lastField=t; dirty=false; fxChanged=false;
     window.__fieldMs=performance.now()-_t0; window.__animOn=animOn;   // perf hook: JS self-time of field recompute (measure this, NOT headless FPS). __cfMs=computeField JS, __giMs=getImageData readback
   }
+  if(reduced&&!need)return;
   ctx.clearRect(0,0,cssW,cssH);
   ctx.drawImage(sceneC,0,0);
   if(fx.ht.on && htSrc){
-    const anim = fx.ht.breathe>0.01 || fx.ht.shimmer>=1;
+    const anim = !reduced && (fx.ht.breathe>0.01 || fx.ht.shimmer>=1);
     if(need || (anim && t-lastPt>1000/PT_FPS)){ drawPointField(t,dark); lastPt=t; }
     if(fx.ht.glow>0.01) blitUp(dynBloomC, fx.ht.additive?'lighter':'source-over', clamp(fx.ht.glow,0,1));
     blitUp(dynC, (fx.ht.additive&&dark)?'lighter':'source-over');
   }
-  if(fx.flow.on) drawFlow(t,dark);
+  if(fx.flow.on&&!reduced) drawFlow(t,dark);
   if(fx.grain.on){ const g=grainC[(t*0.05|0)%grainC.length]; const sz=Math.max(1,fx.grain.size); const gw=maskTexC.width,gh=maskTexC.height;
     maskTexX.setTransform(1,0,0,1,0,0); maskTexX.globalCompositeOperation='source-over'; maskTexX.clearRect(0,0,gw,gh);
     const pat=maskTexX.createPattern(g,'repeat'); maskTexX.fillStyle=pat;
-    maskTexX.setTransform(sz,0,0,sz,(Math.random()*60)|0,(Math.random()*60)|0); maskTexX.fillRect(0,0,gw/sz+60,gh/sz+60);
+    maskTexX.setTransform(sz,0,0,sz,reduced?0:(Math.random()*60)|0,reduced?0:(Math.random()*60)|0); maskTexX.fillRect(0,0,gw/sz+60,gh/sz+60);
     maskTexX.setTransform(1,0,0,1,0,0);
     maskTexX.globalCompositeOperation='destination-in'; maskTexX.drawImage(pl.canvas,0,0,gw,gh); maskTexX.globalCompositeOperation='source-over';
     blitUp(maskTexC, dark?'lighten':'overlay', clamp(fx.grain.op,0,1)); }
   if(mode==='edit'){ if(!globalTab) drawHandles(); } else if(fi&&introReveal>=1){const p=getProj(fi);if(p)drawMarkers(p);}
-  requestAnimationFrame(render);
 }
 
 function getProj(id){return projects.find(p=>p.id===id);}
@@ -815,11 +844,11 @@ function bindWheelEvents(){ let dragging=false;
 /* present mode DOM */
 const legendEl=document.getElementById('legend'), readoutEl=document.getElementById('readout');
 function buildLegend(){ const vis=projects.filter(p=>p.code!=='P-07'); legendEl.innerHTML='<div class="lg-h">INDEX / '+String(vis.length).padStart(2,'0')+'</div>';
-  vis.forEach(p=>{const row=document.createElement('div');row.className='lg-row';row.dataset.id=p.id;
+  vis.forEach(p=>{const row=document.createElement('a');row.className='lg-row';row.dataset.id=p.id;if(PAGES[p.code])row.href=MMRoutes.href(PAGES[p.code]);
     row.innerHTML=`<span class="lg-dot" style="background:${rgbStr(p.colors.core)}"></span><span class="lg-code">${p.code}</span><span class="lg-name">${p.name}</span>`;
     row.onmouseenter=()=>{if(!lock){hover=p.id;syncLegend();updateReadout();}};
     row.onmouseleave=()=>{if(!lock){hover=null;syncLegend();updateReadout();}};
-    row.onclick=()=>{ if(PAGES[p.code]) MMAnalytics.openProject(PAGES[p.code],'index'); };
+    row.onclick=e=>{ if(PAGES[p.code]&&!e.metaKey&&!e.ctrlKey&&!e.shiftKey&&!e.altKey){e.preventDefault();MMAnalytics.openProject(PAGES[p.code],'index');} };
     legendEl.appendChild(row);});
   const ab=document.createElement('a'); ab.className='lg-about'; ab.href=MMRoutes.href('about');
   ab.innerHTML='<span>About the studio</span>';
@@ -1166,11 +1195,10 @@ function sanitizeProjects(){ projects.forEach(p=>{
 /* Keep the ground and lattice fully visible while only the matter awakens. */
 const landingStarted=performance.now();
 function introAwaken(target){
-  const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
   const T0=Math.max(performance.now(),landingStarted+560), DUR=1600;
   document.documentElement.classList.add('field-entering');
   (function step(now){
-    const p=reduced?1:clamp((now-T0)/DUR,0,1), e=p*p*(3-2*p);
+    const p=MMMotion.reduced?1:clamp((now-T0)/DUR,0,1), e=p*p*(3-2*p);
     introReveal=smoothstep(0,.4,p);
     // A restrained overshoot makes the growth legible before the field settles.
     const back=1+2.15*Math.pow(p-1,3)+1.15*Math.pow(p-1,2);

@@ -1,0 +1,70 @@
+{
+  "home": {
+    "name": "MODE MODE",
+    "title": "MODE MODE — Creative Technology & Design",
+    "description": "Creative technology, experiential design, fabrication, art, and play. A studio in Brooklyn.",
+    "image": "assets/share/mode-mode.jpg",
+    "imageAlt": "MODE MODE — creative technology, design, fabrication, art, and play"
+  },
+  "about": {
+    "name": "About",
+    "title": "About — MODE MODE",
+    "description": "A Brooklyn studio working across creative technology, experiential design, fabrication, art, and play.",
+    "image": "assets/share/mode-mode.jpg",
+    "imageAlt": "MODE MODE — creative technology, design, fabrication, art, and play",
+    "copy": {
+      "kicker": "MODE MODE — ABOUT",
+      "lede": "Strange and beautiful things emerge where disciplines lose their edges",
+      "body": "MODE MODE is a studio working between/across/within the nodes creative technology, experiential design, fabrication, visual systems, art, and play.\n\nWe enjoy creating in all scales from focused, intricate experiences to large, inter-disciplinary projects.",
+      "meta": "BROOKLYN, NEW YORK\nCREATIVE / DESIGN / TECH / FABRICATION STUDIO"
+    }
+  },
+  "65porter": {
+    "name": "65 PORTER",
+    "title": "65 PORTER — MODE MODE",
+    "description": "Interior design for Madwell’s 21,000-square-foot Brooklyn workspace.",
+    "image": "assets/share/65porter.jpg",
+    "imageAlt": "65 Porter — interior of Madwell’s Brooklyn workspace",
+    "sourceImage": "https://images.squarespace-cdn.com/content/v1/5eb3104d0e74237ec948380b/1732580661448-EC64TJEZAADXSZJQGWST/_8504017.jpg"
+  },
+  "nightmare-kart": {
+    "name": "NIGHTMARE KART",
+    "title": "NIGHTMARE KART — MODE MODE",
+    "description": "A custom arcade cabinet for Nightmare Kart, built with LWMedia and Arcade Commons.",
+    "image": "assets/share/nightmare-kart.jpg",
+    "imageAlt": "NIGHTMARE KART — faux stained-glass marquee",
+    "sourceImage": "https://vjvjparfulrtsxdslrpg.supabase.co/storage/v1/object/public/project-media/nightmare-kart/1784138773867-NMK-92.jpg"
+  },
+  "selected-arcade": {
+    "name": "SELECTED ARCADE",
+    "title": "SELECTED ARCADE — MODE MODE",
+    "description": "Custom arcade cabinets for HOVERBURGER, Hair Nah, Dyebreaker, and Kung Fu Kickball.",
+    "image": "assets/share/selected-arcade.jpg",
+    "imageAlt": "A selection of custom arcade cabinets at an arcade",
+    "sourceImage": "https://vjvjparfulrtsxdslrpg.supabase.co/storage/v1/object/public/project-media/selected-arcade/1786926503028-hoverburger-launch-2.jpg"
+  },
+  "massive": {
+    "name": "MASSIVE",
+    "title": "MASSIVE — MODE MODE",
+    "description": "A four-player arcade game about matter and the scale of the universe.",
+    "image": "assets/share/massive.jpg",
+    "imageAlt": "MASSIVE — four-player arcade cabinet",
+    "sourceImage": "https://images.squarespace-cdn.com/content/v1/5eb3104d0e74237ec948380b/53e770ab-11fd-4e59-ba67-13442feda437/massive-main.png"
+  },
+  "eyeknow-manor": {
+    "name": "EYEKNOW MANOR",
+    "title": "EYEKNOW MANOR — MODE MODE",
+    "description": "A haunted, multi-room experience for Fernet-Branca in New Orleans.",
+    "image": "assets/share/eyeknow-manor.jpg",
+    "imageAlt": "The Eyeknow Manor of Spirits & Astonishments",
+    "sourceImage": "https://vjvjparfulrtsxdslrpg.supabase.co/storage/v1/object/public/project-media/eyeknow-manor/1782704240588-Fernet-Branca_eventbrite_copia.jpg"
+  },
+  "gif": {
+    "name": "GIF",
+    "title": "GIF — MODE MODE",
+    "description": "An interactive neon sculpture that turns a loading symbol into physical light.",
+    "image": "assets/share/gif.jpg",
+    "imageAlt": "Gyroscopic Illuminated Figure — neon loading symbol at an angle",
+    "sourceImage": "https://images.squarespace-cdn.com/content/v1/5eb3104d0e74237ec948380b/1588815859685-U3I5M1YA2P3REM1W4NOS/gif-angle.jpg"
+  }
+}
