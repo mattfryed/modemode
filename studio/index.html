@@ -238,7 +238,8 @@ function viewDoc(row,payments){
   const balanceCents=totals.totalCents-paidCents;
   let displayStatus=row.status;
   if(row.kind==='invoice'&&row.status==='issued') displayStatus=balanceCents===0?'paid':(paidCents?'part paid':(row.data.dueDate&&row.data.dueDate<V.today()?'overdue':'issued'));
-  return { id:row.id,projectId:row.project_id,kind:row.kind,status:row.status,displayStatus,number:row.number,revision:row.revision,data:row.data,snapshot:row.snapshot,sourceId:row.source_id,issuedAt:row.issued_at,createdAt:row.created_at,updatedAt:row.updated_at,pdfPath:row.pdf_path,pdfHash:row.pdf_hash,totals,paidCents,balanceCents,payments };
+  const {removedAt=null,versions=[],changes=[]}=row.data._studio||{};
+  return { id:row.id,projectId:row.project_id,kind:row.kind,status:row.status,displayStatus:removedAt?'removed':displayStatus,number:row.number,revision:row.revision,data:row.data,snapshot:row.snapshot,sourceId:row.source_id,issuedAt:row.issued_at,createdAt:row.created_at,updatedAt:row.updated_at,pdfPath:row.pdf_path,pdfHash:row.pdf_hash,totals,paidCents,balanceCents,payments,removedAt,versions,changes };
 }
 async function getDocRow(id){ const { data,error }=await sb.from(T.documents).select('*').eq('id',id).maybeSingle(); if(error) throw new Error(error.message); if(!data) throw new Error('Document not found.'); return data; }
 async function ev(docId,type,data={}){ await sb.from(T.events).insert({document_id:docId||null,type,data}); }
@@ -247,7 +248,7 @@ async function buildSnapshot(row,number){
   if(!proj) throw new Error('Project is missing.');
   const { data:cl }=await sb.from(T.clients).select('*').eq('id',proj.client_id).single();
   if(!cl) throw new Error('Client is missing.');
-  const { internalNotes, ...data }=row.data;
+  const { internalNotes, _studio, ...data }=row.data;
   return { templateVersion:1, kind:row.kind, number:number??null, company:settings, client:{id:cl.id,...cl.data}, project:{id:proj.id,...proj.data}, data };
 }
 async function defaultDoc(projectId,kind){
@@ -258,7 +259,7 @@ async function defaultDoc(projectId,kind){
   return V.document({ title:p.name, issueDate:dt, dueDate:due.toISOString().slice(0,10), reference:p.reference, items:[], tax:'0.00', sections:{terms:s.proposalTerms}, terms:kind==='invoice'?s.invoiceTerms:'', paymentInstructions:kind==='invoice'?s.paymentInstructions:'' }, kind);
 }
 async function newDocument(projectId,kind,data=null,sourceId=null){
-  const value=data||await defaultDoc(projectId,kind);
+  const value=data?V.document(data,kind):await defaultDoc(projectId,kind);
   const { data:ins,error }=await sb.from(T.documents).insert({ project_id:projectId, kind, data:value, source_id:sourceId }).select('id').single();
   if(error) throw new Error(error.message);
   await ev(ins.id,'created',{sourceId}); return {id:ins.id};
@@ -271,15 +272,29 @@ async function apiState(){
     sb.from(T.payments).select('*') ]);
   for(const r of [cl,pr,docs,pays]) if(r.error) throw new Error(r.error.message);
   const payments=pays.data||[];
+  const documents=(docs.data||[]).map(r=>viewDoc(r,paymentsFor(payments,r.id)));
   return {
     version:'0.1.0-hosted', settings,
     clients:(cl.data||[]).map(r=>({id:r.id,...r.data})),
     projects:(pr.data||[]).map(r=>({id:r.id,...r.data})),
-    documents:(docs.data||[]).map(r=>viewDoc(r,paymentsFor(payments,r.id))),
+    documents:documents.filter(d=>!d.removedAt),
+    removedDocuments:documents.filter(d=>d.removedAt),
     today:V.today()
   };
 }
 function requireRevision(row,payload){ if(payload.revision!==row.revision) throw new Error('This document changed in another tab. Reload before saving or issuing.'); }
+// Keep lifecycle history in the existing JSON document; no schema migration is needed.
+function studioChange(row,type,extra={}){
+  const meta=structuredClone(row.data._studio||{});
+  meta.changes=[...(meta.changes||[]),{type,at:new Date().toISOString(),...extra}];
+  return meta;
+}
+async function updateDocument(row,values){
+  const {data,error}=await sb.from(T.documents).update({...values,revision:row.revision+1})
+    .eq('id',row.id).eq('revision',row.revision).eq('status',row.status).select('id').maybeSingle();
+  if(error) throw new Error(error.message);
+  if(!data) throw new Error('This document changed in another tab or could not be updated. Reload and try again.');
+}
 
 // The ported router. Mirrors server/index.js so the front-end talks to it unchanged.
 async function api(path, method='GET', body){
@@ -318,11 +333,42 @@ async function api(path, method='GET', body){
   m=path.match(/^\/api\/documents\/([a-f0-9-]+)(?:\/(\w+))?$/);
   if(m){
     const row=await getDocRow(m[1]); const action=m[2];
+    if(row.data._studio?.removedAt&&action!=='restore') throw new Error('Restore this invoice before changing it.');
+    if((!action&&method==='DELETE')||(action==='restore'&&method==='POST')){
+      requireRevision(row,body);
+      if(row.kind!=='invoice') throw new Error('Only invoices can be removed or restored here.');
+      const restoring=action==='restore';
+      if(restoring&&!row.data._studio?.removedAt) throw new Error('This invoice is not removed.');
+      const meta=studioChange(row,restoring?'restored':'removed');
+      meta.removedAt=restoring?null:new Date().toISOString();
+      await updateDocument(row,{data:{...row.data,_studio:meta}});
+      return {id:row.id};
+    }
     if(!action&&method==='PUT'){
-      requireRevision(row,body); if(row.status!=='draft') throw new Error('Issued documents cannot be edited. Duplicate or void the record instead.');
+      requireRevision(row,body);
+      const issuedInvoice=row.kind==='invoice'&&row.status==='issued';
+      if(row.status!=='draft'&&!issuedInvoice) throw new Error('Only drafts and non-void issued invoices can be edited.');
       const data=V.document(body.data,row.kind);
-      const { error }=await sb.from(T.documents).update({data,revision:row.revision+1}).eq('id',row.id); if(error) throw new Error(error.message);
-      await ev(row.id,'draft-saved'); return {id:row.id};
+      if(!issuedInvoice){
+        if(row.data._studio)data._studio=structuredClone(row.data._studio);
+        await updateDocument(row,{data});
+        await ev(row.id,'draft-saved'); return {id:row.id};
+      }
+      if(body.reviewed!==true) throw new Error('Review the updated invoice before saving.');
+      if(!row.snapshot) throw new Error('The issued snapshot is missing. Restore it before editing this invoice.');
+      const total=totalItems(data.items,data.tax).totalCents;
+      if(!data.items.length||!total||!data.dueDate||!data.paymentInstructions) throw new Error('An issued invoice needs a positive total, a due date, and payment instructions.');
+      const {data:pays,error:payError}=await sb.from(T.payments).select('*').eq('document_id',row.id);
+      if(payError) throw new Error(payError.message);
+      const paid=(pays||[]).filter(p=>!p.reversed_at).reduce((sum,p)=>sum+p.amount_cents,0);
+      if(total<paid) throw new Error('The invoice total cannot be less than its recorded payments. Correct the payment records first.');
+      const meta=studioChange(row,'invoice-edited');
+      meta.versions=[...(meta.versions||[]),{revision:row.revision,savedAt:meta.changes.at(-1).at,snapshot:row.snapshot,pdfPath:row.pdf_path,pdfHash:row.pdf_hash}];
+      const {internalNotes,...publicData}=data;
+      const snapshot={...row.snapshot,data:publicData};
+      // Retain every previous PDF. The revised PDF is generated from its new snapshot.
+      await updateDocument(row,{data:{...data,_studio:meta},snapshot,pdf_path:null,pdf_hash:null});
+      return {id:row.id};
     }
     if(action==='issue'&&method==='POST'){
       requireRevision(row,body); if(row.status!=='draft') throw new Error('This document has already been issued.');
@@ -342,30 +388,30 @@ async function api(path, method='GET', body){
       try{ const blob=await pdfBlob(snap); const buf=await blob.arrayBuffer(); pdf_hash=await sha256Hex(buf);
         pdf_path=number+'.pdf'; const { error:upErr }=await sb.storage.from('studio-pdfs').upload(pdf_path,blob,{contentType:'application/pdf',upsert:true}); if(upErr) throw upErr;
       }catch(e){ /* keep issuing even if storage write fails; PDF is regenerable from the frozen snapshot */ pdf_path=null; }
-      const { error }=await sb.from(T.documents).update({ status:'issued', number, snapshot:snap, pdf_path, pdf_hash, issued_at:new Date().toISOString(), revision:row.revision+1 }).eq('id',row.id);
-      if(error) throw new Error(error.message);
+      await updateDocument(row,{status:'issued',number,snapshot:snap,pdf_path,pdf_hash,issued_at:new Date().toISOString()});
       await ev(row.id,'issued',{number,pdfHash:pdf_hash}); return {id:row.id,number};
     }
     if(action==='sent'&&method==='POST'){ if(!['issued','accepted','declined'].includes(row.status)) throw new Error('Only an issued document can be marked as sent.'); await ev(row.id,'sent-manually',{note:V.text(body.note,1000)}); return {ok:true}; }
     if(['accept','decline'].includes(action)&&method==='POST'){
       if(row.kind!=='proposal'||row.status!=='issued') throw new Error('Only an issued, undecided proposal can be marked accepted or declined.');
       const note=V.text(body.note,2000); if(!note) throw new Error('Record the client confirmation or decision reference.');
-      const { error }=await sb.from(T.documents).update({status:action==='accept'?'accepted':'declined',revision:row.revision+1}).eq('id',row.id); if(error) throw new Error(error.message);
+      await updateDocument(row,{status:action==='accept'?'accepted':'declined'});
       await ev(row.id,action==='accept'?'accepted-manually':'declined-manually',{note}); return {ok:true};
     }
     if(action==='void'&&method==='POST'){
       if(row.status==='draft'||row.status==='void') throw new Error('Only a non-void issued document can be voided.');
-      const { data:pays }=await sb.from(T.payments).select('*').eq('document_id',row.id);
+      const { data:pays,error:payError }=await sb.from(T.payments).select('*').eq('document_id',row.id);
+      if(payError) throw new Error(payError.message);
       if(paymentsFor(pays||[],row.id).filter(p=>!p.reversed_at).reduce((s,p)=>s+p.amount_cents,0)>0) throw new Error('This invoice has recorded payments. Resolve/reverse the records before voiding. This app does not issue refunds.');
       const reason=V.text(body.reason,2000); if(!reason) throw new Error('A reason is required.');
-      const { error }=await sb.from(T.documents).update({status:'void',revision:row.revision+1}).eq('id',row.id); if(error) throw new Error(error.message);
+      await updateDocument(row,{status:'void'});
       await ev(row.id,'voided',{reason}); return {ok:true};
     }
     if(action==='clone'&&method==='POST'){ const data=structuredClone(row.data); data.issueDate=V.today(); data.dueDate=''; return newDocument(row.project_id,row.kind,data,row.id); }
     if(action==='convert'&&method==='POST'){
       if(row.kind!=='proposal'||row.status!=='accepted') throw new Error('Record acceptance before making an invoice from a proposal.');
       const { data:ex }=await sb.from(T.documents).select('id').eq('source_id',row.id).eq('kind','invoice').neq('status','void').maybeSingle();
-      if(ex) throw new Error('An invoice is already linked to this proposal. Open that draft rather than duplicating the billing.');
+      if(ex) throw new Error('An invoice is already linked to this proposal. Open or restore that invoice rather than duplicating the billing.');
       const s=await getSettings(); const dd=structuredClone(row.data); dd.issueDate=V.today(); dd.dueDate=''; dd.sections={}; dd.terms=s.invoiceTerms; dd.paymentInstructions=s.paymentInstructions; dd.notes='From proposal '+row.number+'.';
       return newDocument(row.project_id,'invoice',dd,row.id);
     }
@@ -387,6 +433,8 @@ async function api(path, method='GET', body){
   if(m&&method==='POST'){
     const { data:p }=await sb.from(T.payments).select('*').eq('id',m[1]).maybeSingle();
     if(!p||p.reversed_at) throw new Error('Payment is missing or already reversed.');
+    const invoice=await getDocRow(p.document_id);
+    if(invoice.data._studio?.removedAt) throw new Error('Restore this invoice before changing its payment records.');
     const reason=V.text(body.reason,1000); if(!reason) throw new Error('A correction reason is required.');
     const { error }=await sb.from(T.payments).update({reversed_at:new Date().toISOString(),reversal_reason:reason}).eq('id',p.id); if(error) throw new Error(error.message);
     await ev(p.document_id,'payment-record-reversed',{paymentId:p.id,reason}); return {ok:true};
@@ -417,7 +465,7 @@ $('#exportBtn').onclick=()=>safe(exportJson);
 
 /* ================= UI (adapted from public/app.js) ============================= */
 const app=$('#app'),dialog=$('#dialog');
-let state,working=null,currentDoc=null,dirty=false,activeTab='',lastRoute='',toastTimer,modalHandler;
+let state,working=null,currentDoc=null,dirty=false,editingInvoice=false,activeTab='',lastRoute='',toastTimer,modalHandler;
 async function reload(){ state=await api('/api/state'); }
 function toast(message,time=5000){ clearTimeout(toastTimer); $('#toast').textContent=message; $('#toast').classList.add('visible'); toastTimer=setTimeout(()=>$('#toast').classList.remove('visible'),time); }
 function badge(d){ return `<span class="badge ${esc(d.displayStatus.replaceAll(' ','-'))}">${esc(d.displayStatus)}</span>`; }
@@ -431,16 +479,17 @@ function tableView(docs){
 }
 function overview(){
   const invoices=state.documents.filter(d=>d.kind==='invoice'&&d.status==='issued');
-  const open=invoices.reduce((s,d)=>s+d.balanceCents,0),paid=invoices.reduce((s,d)=>s+d.paidCents,0),proposals=state.documents.filter(d=>d.kind==='proposal'&&['draft','issued'].includes(d.status));
+  const open=invoices.reduce((s,d)=>s+d.balanceCents,0),paid=[...state.documents,...state.removedDocuments].filter(d=>d.kind==='invoice').reduce((s,d)=>s+d.paidCents,0),proposals=state.documents.filter(d=>d.kind==='proposal'&&['draft','issued'].includes(d.status));
   app.innerHTML=head('Overview','',btn('+ Proposal','new-document','primary','data-kind="proposal"')+btn('+ Invoice','new-document','','data-kind="invoice"'))+
   (!state.settings.legalName?`<div class="notice">Set your legal payee identity and payment instructions in <a href="#settings"><u>Settings</u></a> before issuing.</div>`:'')+
   `<div class="stats"><div class="stat"><div class="label">Outstanding invoices</div><div class="value">${usd(open)}</div><div class="note">${invoices.filter(d=>d.balanceCents>0).length} open / excludes drafts</div></div><div class="stat"><div class="label">Proposals in motion</div><div class="value">${String(proposals.length).padStart(2,'0')}</div><div class="note">Drafts + awaiting a decision</div></div><div class="stat"><div class="label">Payments recorded</div><div class="value">${usd(paid)}</div><div class="note">All time / manually entered</div></div></div>`+
   `<div class="section-head"><h2>Recent documents</h2><span class="muted"><small>${state.projects.length} projects / ${state.clients.length} clients</small></span></div>${tableView(state.documents.slice(0,8))}`+
   (!state.documents.length?`<div class="footer-note">${btn('Load a fictional example','demo','mini quiet')} One demo client, project, and draft proposal.</div>`:'');
 }
-function documentList(kind){
-  const docs=state.documents.filter(d=>d.kind===kind);
-  app.innerHTML=head(kind==='proposal'?'Proposals':'Invoices','',btn('+ '+(kind==='proposal'?'Proposal':'Invoice'),'new-document','primary',`data-kind="${kind}"`))+
+function documentList(kind,removed=false){
+  const docs=(removed?state.removedDocuments:state.documents).filter(d=>d.kind===kind);
+  const toggle=kind==='invoice'?`<a class="button quiet" href="#${removed?'invoices':'removed-invoices'}">${removed?'Active invoices':'Removed ('+state.removedDocuments.length+')'}</a>`:'';
+  app.innerHTML=head(removed?'Removed invoices':kind==='proposal'?'Proposals':'Invoices',removed?'Open an invoice to restore it. Its payments and PDF history are retained.':'',toggle+btn('+ '+(kind==='proposal'?'Proposal':'Invoice'),'new-document','primary',`data-kind="${kind}"`))+
   `<div class="toolbar"><input id="search" type="search" placeholder="Search project, client, or number" aria-label="Search documents"><span class="count">${docs.length} documents / USD</span></div><div id="document-list">${tableView(docs)}</div>`;
   $('#search').addEventListener('input',e=>{const q=e.target.value.toLowerCase();$('#document-list').innerHTML=tableView(docs.filter(d=>[d.data.title,d.number,clientFor(d).name,d.displayStatus].join(' ').toLowerCase().includes(q)));});
 }
@@ -482,25 +531,31 @@ function tab(which){ activeTab=which;$$('[data-tab]').forEach(b=>b.classList.tog
 async function loadEvents(){
   if(!currentDoc)return;const docId=currentDoc.id;const target=$('#event-list');if(!target)return;
   try{ const events=await api(`/api/documents/${docId}/events`);if(currentDoc?.id!==docId)return;
-    target.innerHTML=`<div class="activity">${events.map(e=>`<div class="event"><strong>${esc(e.type.replaceAll('-',' '))}</strong><time>${esc(new Date(e.created_at).toLocaleString())}</time>${e.data.note||e.data.reason?`<p>${esc(e.data.note||e.data.reason)}</p>`:''}${e.data.amountCents?`<p>${usd(e.data.amountCents)}</p>`:''}${e.data.number?`<p>${esc(e.data.number)}</p>`:''}</div>`).join('')}</div>`;
+    const history=[...events,...currentDoc.changes.map(c=>({type:c.type,created_at:c.at,data:{}}))].sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)));
+    const versions=currentDoc.versions.map((v,n)=>`<div class="ledger-row"><div><strong>Previous invoice · revision ${esc(v.revision)}</strong><small>Replaced ${esc(new Date(v.savedAt).toLocaleString())}</small></div>${btn('Download PDF','version-pdf','mini quiet',`data-index="${n}"`)}</div>`).join('');
+    target.innerHTML=(versions?`<h3>Previous PDFs</h3>${versions}<hr>`:'')+`<div class="activity">${history.map(e=>`<div class="event"><strong>${esc(e.type.replaceAll('-',' '))}</strong><time>${esc(new Date(e.created_at).toLocaleString())}</time>${e.data.note||e.data.reason?`<p>${esc(e.data.note||e.data.reason)}</p>`:''}${e.data.amountCents?`<p>${usd(e.data.amountCents)}</p>`:''}${e.data.number?`<p>${esc(e.data.number)}</p>`:''}</div>`).join('')}</div>`;
   }catch(e){target.textContent=e.message;}
 }
 async function editor(docId){
   currentDoc=await api(`/api/documents/${docId}`);const d=currentDoc;working=structuredClone(d.data);
-  const draft=d.status==='draft',proposal=d.kind==='proposal';
-  const tabs=draft?(proposal?['content','fees','details','private','activity']:['fees','details','private','activity']):['record','activity'];
+  const draft=d.status==='draft',proposal=d.kind==='proposal',removed=!!d.removedAt;
+  const editable=!removed&&(draft||(editingInvoice&&!proposal&&d.status==='issued'));
+  const documentActions=removed?btn('Restore invoice','restore-invoice','primary')+(draft?'':btn('Download PDF','original-pdf')):editingInvoice?btn('Save changes','save','primary')+btn('Cancel editing','cancel-edit','quiet'):draft?btn('Save draft','save','primary')+btn('Download draft PDF','draft-pdf')+btn(proposal?'Issue & freeze':'Issue invoice','issue'):btn(proposal?'Download original PDF':'Download PDF','original-pdf','primary')+(!proposal&&d.status==='issued'?btn('Edit invoice','edit-invoice'):'')+btn('Duplicate as draft','clone','quiet');
+  const tabs=editable?(proposal?['content','fees','details','private','activity']:['fees','details','private','activity']):['record','activity'];
   if(!tabs.includes(activeTab))activeTab=tabs[0];
   app.innerHTML=`<div class="document-head"><div class="eyebrow"><a href="#${proposal?'proposals':'invoices'}">← ${proposal?'PROPOSALS':'INVOICES'}</a> / ${esc(d.number||'DRAFT')}</div><header class="page-head"><div><h1>${esc(d.data.title)}</h1><div class="doc-meta"><span>${esc(clientFor(d).name)}</span>${badge(d)}</div></div></header></div>
-  <div class="commandbar"><div class="actions">${draft?btn('Save draft','save','primary')+btn('Download draft PDF','draft-pdf')+btn('Issue & freeze','issue'):btn('Download original PDF','original-pdf','primary')+btn('Duplicate as draft','clone','quiet')}</div><span class="save-status" id="save-status">${draft?'All changes saved':`Issued ${esc((d.issuedAt||'').slice(0,10))}`}</span></div>
+  <div class="commandbar"><div class="actions">${documentActions}${!proposal&&!removed?btn('Remove invoice','remove-invoice','quiet danger'):''}</div><span class="save-status" id="save-status">${editable?'All changes saved':removed?'Removed':`Issued ${esc((d.issuedAt||'').slice(0,10))}`}</span></div>
+  ${removed?'<div class="notice"><strong>Removed invoice.</strong> Restore it to edit or record payments. Previous payments and PDFs are retained.</div>':''}
+  ${editingInvoice?'<div class="notice">Editing this invoice keeps its number and billing identity. Saving creates an updated PDF; previous PDFs remain in Activity.</div>':''}
   ${d.status==='void'?'<div class="notice"><strong>Voided record — not payable.</strong> The original PDF is retained unchanged for history. It is not a replacement invoice or credit note.</div>':''}
   <div class="editor-layout"><div><div class="tabs">${tabs.map(t=>`<button type="button" data-tab="${t}" class="${activeTab===t?'on':''}">${t==='content'?'Proposal':t==='private'?'Private notes':t[0].toUpperCase()+t.slice(1)}</button>`).join('')}</div>
-  ${draft?`${proposal?`<section id="tab-content" class="tab-content" ${activeTab!=='content'?'hidden':''}><div class="panel"><h2 class="panel-title">The proposal</h2><p class="help">Plain text sections. Blank sections are omitted from the PDF. Paragraphs and line breaks are preserved.</p>${[['overview','Overview','What the project is and what it needs to achieve.'],['scope','Scope of work','The work you will do.'],['deliverables','Deliverables','What the client receives.'],['timeline','Timeline','Milestones, dependencies and access windows.'],['assumptions','Assumptions & exclusions','What is assumed, supplied by others, or out of scope.'],['terms','Terms & next steps','Your approved terms and how the client should confirm.']].map(([key,label,placeholder])=>`<label>${label}<textarea data-section="${key}" rows="5" placeholder="${placeholder}">${esc(working.sections[key])}</textarea></label>`).join('')}</div></section>`:''}
+  ${editable?`${proposal?`<section id="tab-content" class="tab-content" ${activeTab!=='content'?'hidden':''}><div class="panel"><h2 class="panel-title">The proposal</h2><p class="help">Plain text sections. Blank sections are omitted from the PDF. Paragraphs and line breaks are preserved.</p>${[['overview','Overview','What the project is and what it needs to achieve.'],['scope','Scope of work','The work you will do.'],['deliverables','Deliverables','What the client receives.'],['timeline','Timeline','Milestones, dependencies and access windows.'],['assumptions','Assumptions & exclusions','What is assumed, supplied by others, or out of scope.'],['terms','Terms & next steps','Your approved terms and how the client should confirm.']].map(([key,label,placeholder])=>`<label>${label}<textarea data-section="${key}" rows="5" placeholder="${placeholder}">${esc(working.sections[key])}</textarea></label>`).join('')}</div></section>`:''}
   <section id="tab-fees" class="tab-content" ${activeTab!=='fees'?'hidden':''}><div class="panel"><h2 class="panel-title">Fees & materials</h2><div id="fees-container">${feesMarkup()}</div></div></section>
   <section id="tab-details" class="tab-content" ${activeTab!=='details'?'hidden':''}><div class="panel"><h2 class="panel-title">Document details</h2><label>Project title on PDF<input data-field="title" value="${esc(working.title)}"></label><div class="grid2"><label>Issue date<input type="date" data-field="issueDate" value="${esc(working.issueDate)}"></label><label>${proposal?'Valid until':'Due date'}<input type="date" data-field="dueDate" value="${esc(working.dueDate)}"></label></div><label>PO / reference<input data-field="reference" value="${esc(working.reference)}"></label><label>${proposal?'Commercial notes':'Payment terms'}<textarea data-field="terms" rows="4">${esc(working.terms)}</textarea></label>${!proposal?`<label>Payment instructions<textarea data-field="paymentInstructions" rows="4" placeholder="Payment details supplied separately, or your approved remittance instructions.">${esc(working.paymentInstructions)}</textarea></label>`:''}<label>Additional client-facing notes<textarea data-field="notes" rows="4">${esc(working.notes)}</textarea></label></div></section>
   <section id="tab-private" class="tab-content" ${activeTab!=='private'?'hidden':''}><div class="panel"><h2 class="panel-title">Internal only</h2><label>Private project / pricing notes<textarea data-field="internalNotes" rows="10" placeholder="Never included in the client-facing PDF.">${esc(working.internalNotes)}</textarea></label><p class="help">Private notes are saved in the database and included in your JSON exports. Do not send a data export to a client.</p></div></section>`:
-  `<section id="tab-record" class="tab-content" ${activeTab!=='record'?'hidden':''}><div class="issued-summary"><div class="panel-title">${proposal?'Proposal record':'Invoice & balance'}</div><div class="total-row"><span>${proposal?'Proposed fee':'Invoice total'}</span><strong>${usd(d.totals.totalCents)}</strong></div>${!proposal?`<div class="total-row"><span>Payments recorded</span><span>${usd(d.paidCents)}</span></div><div class="total-row grand"><span>Balance due</span><strong>${usd(d.balanceCents)}</strong></div>`:''}<p class="help" style="margin:16px 0 0">The original PDF never changes after issue. ${proposal?'Acceptance is recorded manually, not electronically signed.':'The live balance is tracked here, separately from the original PDF.'}</p></div><div class="panel"><div class="actions">${d.status!=='void'?btn('Record sent','sent','quiet'):''}${proposal&&d.status==='issued'?btn('Record acceptance','accept','primary')+btn('Record decline','decline','quiet'):''}${proposal&&d.status==='accepted'?btn('Create invoice draft','convert','primary'):''}${!proposal&&d.status==='issued'&&d.balanceCents>0?btn('+ Record payment','payment','primary'):''}${d.status!=='void'?btn('Void record','void','quiet danger'):''}</div>${d.sourceId?`<p class="help" style="margin-top:16px"><a href="#document/${d.sourceId}" class="pill-link">Open source document ↗</a></p>`:''}</div>${!proposal?`<section class="panel"><h2 class="panel-title">Payment ledger</h2>${d.payments.length?d.payments.map(p=>`<div class="ledger-row ${p.reversed_at?'reversed':''}"><div><strong>${usd(p.amount_cents)}</strong><small>${esc(p.paid_on)} / ${esc(p.method||'Manual payment')}</small><small>${esc(p.reference)}${p.reversed_at?'<br>Reversed: '+esc(p.reversal_reason):''}</small></div>${!p.reversed_at?btn('Correct record','reverse-payment','mini quiet',`data-id="${p.id}"`):''}</div>`).join(''):'<p class="no-data">No payments recorded.</p>'}</section>`:''}</section>`}
+  `<section id="tab-record" class="tab-content" ${activeTab!=='record'?'hidden':''}><div class="issued-summary"><div class="panel-title">${proposal?'Proposal record':'Invoice & balance'}</div><div class="total-row"><span>${proposal?'Proposed fee':'Invoice total'}</span><strong>${usd(d.totals.totalCents)}</strong></div>${!proposal?`<div class="total-row"><span>Payments recorded</span><span>${usd(d.paidCents)}</span></div><div class="total-row grand"><span>Balance due</span><strong>${usd(d.balanceCents)}</strong></div>`:''}<p class="help" style="margin:16px 0 0">${proposal?'The original PDF never changes after issue. Acceptance is recorded manually, not electronically signed.':'Editing updates the current PDF and keeps the previous version in Activity. Recorded payments remain in the ledger.'}</p></div><div class="panel"><div class="actions">${!removed&&d.status!=='draft'&&d.status!=='void'?btn('Record sent','sent','quiet'):''}${proposal&&d.status==='issued'?btn('Record acceptance','accept','primary')+btn('Record decline','decline','quiet'):''}${proposal&&d.status==='accepted'?btn('Create invoice draft','convert','primary'):''}${!removed&&!proposal&&d.status==='issued'&&d.balanceCents>0?btn('+ Record payment','payment','primary'):''}${!removed&&d.status!=='draft'&&d.status!=='void'?btn('Void record','void','quiet danger'):''}</div>${d.sourceId?`<p class="help" style="margin-top:16px"><a href="#document/${d.sourceId}" class="pill-link">Open source document ↗</a></p>`:''}</div>${!proposal?`<section class="panel"><h2 class="panel-title">Payment ledger</h2>${d.payments.length?d.payments.map(p=>`<div class="ledger-row ${p.reversed_at?'reversed':''}"><div><strong>${usd(p.amount_cents)}</strong><small>${esc(p.paid_on)} / ${esc(p.method||'Manual payment')}</small><small>${esc(p.reference)}${p.reversed_at?'<br>Reversed: '+esc(p.reversal_reason):''}</small></div>${!removed&&!p.reversed_at?btn('Correct record','reverse-payment','mini quiet',`data-id="${p.id}"`):''}</div>`).join(''):'<p class="no-data">No payments recorded.</p>'}</section>`:''}</section>`}
   <section id="tab-activity" class="tab-content" ${activeTab!=='activity'?'hidden':''}><div class="panel"><h2 class="panel-title">Document history</h2><div id="event-list" class="help">Loading history…</div></div></section></div>
-  <aside class="preview-panel"><div class="preview-title"><span>${draft?'Layout preview / last saved draft':'Frozen original / layout preview'}</span><span>US LETTER</span></div><div class="preview-frame"><iframe id="doc-preview" title="Document preview"></iframe></div><p class="help" style="margin-top:12px">The preview is the generated PDF. Download it to check the final page breaks and repeating footer.</p></aside></div>`;
+  <aside class="preview-panel"><div class="preview-title"><span>${draft?'Layout preview / last saved draft':proposal?'Frozen original / layout preview':'Current invoice / last saved version'}</span><span>US LETTER</span></div><div class="preview-frame"><iframe id="doc-preview" title="Document preview"></iframe></div><p class="help" style="margin-top:12px">The preview is the generated PDF. Download it to check the final page breaks and repeating footer.</p></aside></div>`;
   app.addEventListener('input',editorInput,{signal:editorController.signal});app.addEventListener('change',editorInput,{signal:editorController.signal});
   totals();renderPreview(d);if(activeTab==='activity')loadEvents();
 }
@@ -511,11 +566,12 @@ function editorInput(e){
   if(el.dataset.section){working.sections[el.dataset.section]=el.value;markDirty();}
   if(el.dataset.item){const n=Number(el.closest('[data-row]').dataset.row);working.items[n][el.dataset.item]=el.type==='checkbox'?el.checked:el.value;markDirty();totals();}
 }
-async function saveDraft(refresh=true){
-  if(!currentDoc||currentDoc.status!=='draft')return;
-  await api(`/api/documents/${currentDoc.id}`,'PUT',{revision:currentDoc.revision,data:working});dirty=false;await reload();
+async function saveDocument(refresh=true,reviewed=false){
+  if(!currentDoc||currentDoc.removedAt||!(currentDoc.status==='draft'||editingInvoice))return;
+  const issued=currentDoc.status!=='draft';
+  await api(`/api/documents/${currentDoc.id}`,'PUT',{revision:currentDoc.revision,data:working,reviewed});dirty=false;editingInvoice=false;await reload();
   currentDoc=await api(`/api/documents/${currentDoc.id}`);
-  if(refresh){editorController.abort();editorController=new AbortController();await editor(currentDoc.id);}toast('Draft saved.');
+  if(refresh){editorController.abort();editorController=new AbortController();await editor(currentDoc.id);}toast(issued?'Invoice updated. Previous PDF kept in Activity.':'Draft saved.');
 }
 function modal(title,content,button,handler){
   modalHandler=handler;$('#dialog-content').innerHTML=`<h2>${title}</h2>${content}<div id="modal-error" class="error" role="alert"></div><div class="actions"><button type="button" data-close>Cancel</button><button type="submit" class="primary">${button}</button></div>`;dialog.showModal();
@@ -549,12 +605,32 @@ app.addEventListener('click',async e=>{
     if(action==='demo'){const d=await api('/api/demo','POST',{});location.hash='document/'+d.id;return;}
     if(action==='add-item'){working.items.push({description:'',quantity:'1',unit:'',rate:'0.00',showRate:true});$('#fees-container').innerHTML=feesMarkup();markDirty();totals();return;}
     if(action==='remove-item'){working.items.splice(Number(b.dataset.index),1);$('#fees-container').innerHTML=feesMarkup();markDirty();totals();return;}
-    if(action==='save')return saveDraft();
-    if(action==='draft-pdf'){if(dirty)await saveDraft();await downloadPdf(currentDoc);return;}
+    if(action==='edit-invoice'){editingInvoice=true;activeTab='fees';await refreshEditor();return;}
+    if(action==='cancel-edit'){
+      if(dirty&&!confirm('Discard your unsaved invoice changes?'))return;
+      editingInvoice=false;activeTab='record';await refreshEditor();return;
+    }
+    if(action==='save'){
+      if(!editingInvoice)return saveDocument();
+      V.document(working,'invoice');
+      modal('Save invoice changes?',`<p>Update <strong>${esc(currentDoc.number)}</strong> and its PDF. Its number and recorded payments stay the same; the previous PDF remains in Activity.</p><p>If you already sent the invoice, share the updated PDF with your client separately.</p>`,'Save changes',async()=>{await saveDocument(true,true);});return;
+    }
+    if(action==='remove-invoice'){
+      const doc=currentDoc;
+      modal('Remove this invoice?',`<p><strong>${esc(doc.number||doc.data.title)}</strong> will move to Removed invoices and leave the active lists and outstanding balance. You can restore it later.</p><p>Its payments and PDF history are kept.${dirty?' Unsaved edits will be discarded.':''}</p>`,'Remove invoice',async()=>{await api(`/api/documents/${doc.id}`,'DELETE',{revision:doc.revision});dirty=false;editingInvoice=false;activeTab='';location.hash='invoices';toast('Invoice removed. Find it under Removed to restore it.');});return;
+    }
+    if(action==='restore-invoice'){
+      await api(`/api/documents/${currentDoc.id}/restore`,'POST',{revision:currentDoc.revision});await refreshEditor();toast('Invoice restored.');return;
+    }
+    if(action==='version-pdf'){
+      const v=currentDoc.versions[Number(b.dataset.index)];
+      if(v)await downloadOriginal({...currentDoc,snapshot:v.snapshot,pdfPath:v.pdfPath});return;
+    }
+    if(action==='draft-pdf'){if(dirty)await saveDocument();await downloadPdf(currentDoc);return;}
     if(action==='original-pdf'){await downloadOriginal(currentDoc);return;}
     if(action==='issue'){
-      if(dirty)await saveDraft();
-      modal('Issue & freeze this '+currentDoc.kind+'?',`<p>A unique number will be assigned. The PDF and billing details will be saved as an uneditable snapshot. <strong>Nothing will be emailed.</strong></p><p>Total: <strong>${usd(currentDoc.totals.totalCents)}</strong></p><label class="checkbox"><input type="checkbox" name="reviewed" required> I have checked the client, legal payee, scope, dates, amounts, tax treatment, and payment instructions.</label>`,'Issue document',async f=>{await api(`/api/documents/${currentDoc.id}/issue`,'POST',{revision:currentDoc.revision,reviewed:f.reviewed==='on'});activeTab='record';await refreshEditor();toast('Document issued and frozen. Download and send it separately.');});return;
+      if(dirty)await saveDocument();
+      modal('Issue this '+currentDoc.kind+'?',`<p>A unique number will be assigned. The PDF and billing details will be saved. ${currentDoc.kind==='invoice'?'Later invoice edits keep previous versions in Activity.':'The issued proposal remains uneditable.'} <strong>Nothing will be emailed.</strong></p><p>Total: <strong>${usd(currentDoc.totals.totalCents)}</strong></p><label class="checkbox"><input type="checkbox" name="reviewed" required> I have checked the client, legal payee, scope, dates, amounts, tax treatment, and payment instructions.</label>`,'Issue document',async f=>{await api(`/api/documents/${currentDoc.id}/issue`,'POST',{revision:currentDoc.revision,reviewed:f.reviewed==='on'});activeTab='record';await refreshEditor();toast('Document issued. Download and send it separately.');});return;
     }
     if(action==='clone'){const r=await api(`/api/documents/${currentDoc.id}/clone`,'POST',{});activeTab='';location.hash='document/'+r.id;return;}
     if(action==='convert'){
@@ -581,13 +657,13 @@ async function render(force=false){
   const route=(location.hash.slice(1)||'dashboard');
   if(dirty&&!force&&route!==lastRoute&&!confirm('You have unsaved changes. Discard them and leave?')){location.hash=lastRoute;return;}
   if(route===lastRoute&&!force&&dirty)return;
-  dirty=false;lastRoute=route;const token=++renderToken;
+  dirty=false;editingInvoice=false;lastRoute=route;const token=++renderToken;
   editorController.abort();editorController=new AbortController();working=null;currentDoc=null;
   try{
     await reload();if(token!==renderToken)return;
     const [page,docId]=route.split('/');$$('[data-nav]').forEach(a=>a.classList.toggle('active',a.dataset.nav===page));
     if(page==='document'){await editor(docId);$$('[data-nav]').forEach(a=>a.classList.toggle('active',a.dataset.nav===(currentDoc.kind==='proposal'?'proposals':'invoices')));}
-    else if(page==='proposals')documentList('proposal');else if(page==='invoices')documentList('invoice');else if(page==='clients')clients();else if(page==='projects')projects();else if(page==='settings')settings();else overview();
+    else if(page==='proposals')documentList('proposal');else if(page==='invoices')documentList('invoice');else if(page==='removed-invoices'){documentList('invoice',true);$('[data-nav="invoices"]').classList.add('active');}else if(page==='clients')clients();else if(page==='projects')projects();else if(page==='settings')settings();else overview();
   }catch(e){app.innerHTML=head('Could not open this view.',esc(e.message))+'<a class="button" href="#dashboard">Back to overview</a>';}
 }
 window.addEventListener('hashchange',()=>render());
