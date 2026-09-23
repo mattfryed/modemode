@@ -295,12 +295,38 @@ async function updateDocument(row,values){
   if(error) throw new Error(error.message);
   if(!data) throw new Error('This document changed in another tab or could not be updated. Reload and try again.');
 }
+async function saveInvoiceVersion(row,data,snapshot,type){
+  const meta=studioChange(row,type);
+  meta.versions=[...(meta.versions||[]),{revision:row.revision,savedAt:meta.changes.at(-1).at,snapshot:row.snapshot,pdfPath:row.pdf_path,pdfHash:row.pdf_hash}];
+  // Retain every previous PDF. The revised PDF is generated from its new snapshot.
+  await updateDocument(row,{data:{...data,_studio:meta},snapshot,pdf_path:null,pdf_hash:null});
+}
+const billingFields=['name','contact','email','address'];
+const sameBilling=(a,b)=>billingFields.every(key=>(a?.[key]||'')===(b?.[key]||''));
+async function latestInvoiceClient(row){
+  if(row.kind!=='invoice'||row.status!=='issued'||row.data._studio?.removedAt) throw new Error('Client details can only be updated on an active issued invoice.');
+  if(!row.snapshot) throw new Error('The issued snapshot is missing. Restore it before updating client details.');
+  let clientId=row.snapshot.client?.id;
+  if(!clientId){
+    const {data:project,error}=await sb.from(T.projects).select('client_id').eq('id',row.project_id).maybeSingle();
+    if(error) throw new Error(error.message);
+    if(!project) throw new Error('The invoice project could not be found.');
+    clientId=project.client_id;
+  }
+  const {data:client,error}=await sb.from(T.clients).select('*').eq('id',clientId).maybeSingle();
+  if(error) throw new Error(error.message);
+  if(!client) throw new Error('The original client record could not be found.');
+  const {notes,...billing}=V.client(client.data);
+  return {id:client.id,...billing};
+}
 
 // The ported router. Mirrors server/index.js so the front-end talks to it unchanged.
 async function api(path, method='GET', body){
   // ---- reads
   if(method==='GET'){
     if(path==='/api/state') return apiState();
+    const clientMatch=path.match(/^\/api\/documents\/([a-f0-9-]+)\/client$/);
+    if(clientMatch){const row=await getDocRow(clientMatch[1]);return {revision:row.revision,current:row.snapshot?.client||{},latest:await latestInvoiceClient(row)};}
     let m=path.match(/^\/api\/documents\/([a-f0-9-]+)\/events$/);
     if(m){ const { data,error }=await sb.from(T.events).select('*').eq('document_id',m[1]).order('id',{ascending:false}); if(error) throw new Error(error.message); return data||[]; }
     m=path.match(/^\/api\/documents\/([a-f0-9-]+)$/);
@@ -334,6 +360,15 @@ async function api(path, method='GET', body){
   if(m){
     const row=await getDocRow(m[1]); const action=m[2];
     if(row.data._studio?.removedAt&&action!=='restore') throw new Error('Restore this invoice before changing it.');
+    if(action==='client'&&method==='PUT'){
+      requireRevision(row,body);
+      if(body.reviewed!==true) throw new Error('Review the client details before updating this invoice.');
+      const client=await latestInvoiceClient(row);
+      if(body.client?.id!==client.id||!sameBilling(body.client,client)) throw new Error('The client details changed since you opened this dialog. Cancel and reopen Update client details to review them.');
+      if(sameBilling(row.snapshot.client,client)) return {id:row.id,unchanged:true};
+      await saveInvoiceVersion(row,row.data,{...row.snapshot,client},'client-details-updated');
+      return {id:row.id};
+    }
     if((!action&&method==='DELETE')||(action==='restore'&&method==='POST')){
       requireRevision(row,body);
       if(row.kind!=='invoice') throw new Error('Only invoices can be removed or restored here.');
@@ -362,12 +397,9 @@ async function api(path, method='GET', body){
       if(payError) throw new Error(payError.message);
       const paid=(pays||[]).filter(p=>!p.reversed_at).reduce((sum,p)=>sum+p.amount_cents,0);
       if(total<paid) throw new Error('The invoice total cannot be less than its recorded payments. Correct the payment records first.');
-      const meta=studioChange(row,'invoice-edited');
-      meta.versions=[...(meta.versions||[]),{revision:row.revision,savedAt:meta.changes.at(-1).at,snapshot:row.snapshot,pdfPath:row.pdf_path,pdfHash:row.pdf_hash}];
       const {internalNotes,...publicData}=data;
       const snapshot={...row.snapshot,data:publicData};
-      // Retain every previous PDF. The revised PDF is generated from its new snapshot.
-      await updateDocument(row,{data:{...data,_studio:meta},snapshot,pdf_path:null,pdf_hash:null});
+      await saveInvoiceVersion(row,data,snapshot,'invoice-edited');
       return {id:row.id};
     }
     if(action==='issue'&&method==='POST'){
@@ -544,7 +576,7 @@ async function editor(docId){
   const tabs=editable?(proposal?['content','fees','details','private','activity']:['fees','details','private','activity']):['record','activity'];
   if(!tabs.includes(activeTab))activeTab=tabs[0];
   app.innerHTML=`<div class="document-head"><div class="eyebrow"><a href="#${proposal?'proposals':'invoices'}">← ${proposal?'PROPOSALS':'INVOICES'}</a> / ${esc(d.number||'DRAFT')}</div><header class="page-head"><div><h1>${esc(d.data.title)}</h1><div class="doc-meta"><span>${esc(clientFor(d).name)}</span>${badge(d)}</div></div></header></div>
-  <div class="commandbar"><div class="actions">${documentActions}${!proposal&&!removed?btn('Remove invoice','remove-invoice','quiet danger'):''}</div><span class="save-status" id="save-status">${editable?'All changes saved':removed?'Removed':`Issued ${esc((d.issuedAt||'').slice(0,10))}`}</span></div>
+  <div class="commandbar"><div class="actions">${documentActions}${!proposal&&!removed&&d.status==='issued'?btn('Update client details','update-client','quiet'):''}${!proposal&&!removed?btn('Remove invoice','remove-invoice','quiet danger'):''}</div><span class="save-status" id="save-status">${editable?'All changes saved':removed?'Removed':`Issued ${esc((d.issuedAt||'').slice(0,10))}`}</span></div>
   ${removed?'<div class="notice"><strong>Removed invoice.</strong> Restore it to edit or record payments. Previous payments and PDFs are retained.</div>':''}
   ${editingInvoice?'<div class="notice">Editing this invoice keeps its number and billing identity. Saving creates an updated PDF; previous PDFs remain in Activity.</div>':''}
   ${d.status==='void'?'<div class="notice"><strong>Voided record — not payable.</strong> The original PDF is retained unchanged for history. It is not a replacement invoice or credit note.</div>':''}
@@ -581,7 +613,21 @@ $('#dialog-form').addEventListener('submit',async e=>{ e.preventDefault();const 
 dialog.addEventListener('click',e=>{if(e.target.closest('[data-close]'))dialog.close();});
 function clientModal(existing){
   const c=existing||{};
-  modal(existing?'Client billing details':'New client',`${field('name','Legal / billing name',c.name,'text','required')}${field('contact','Contact person',c.contact)}${field('email','Email',c.email,'email')}${area('address','Billing address',c.address,'',3)}${area('notes','Internal notes',c.notes,'',2)}<p class="help">Editing these details updates drafts only. Issued documents retain their original bill-to details.</p>`,existing?'Save client':'Create client',async data=>{await api('/api/clients'+(existing?'/'+existing.id:''),existing?'PUT':'POST',data);await reload();await render(true);toast('Client saved.');});
+  modal(existing?'Client billing details':'New client',`${field('name','Legal / billing name',c.name,'text','required')}${field('contact','Contact person',c.contact)}${field('email','Email',c.email,'email')}${area('address','Billing address',c.address,'',3)}${area('notes','Internal notes',c.notes,'',2)}<p class="help">Editing these details updates drafts only. To update an issued invoice, open it and choose Update client details.</p>`,existing?'Save client':'Create client',async data=>{await api('/api/clients'+(existing?'/'+existing.id:''),existing?'PUT':'POST',data);await reload();await render(true);toast('Client saved.');});
+}
+async function invoiceClientModal(){
+  if(dirty){toast('Save or cancel your invoice edits before updating client details.');return;}
+  const doc=currentDoc;
+  const preview=await api(`/api/documents/${doc.id}/client`);
+  if(currentDoc?.id!==doc.id)return;
+  requireRevision({revision:preview.revision},{revision:doc.revision});
+  if(sameBilling(preview.current,preview.latest)){toast('This invoice already has the latest client details.');return;}
+  const summary=(title,client)=>`<section><h3>${title}</h3>${billingFields.map((key,n)=>`<div style="margin-bottom:12px;overflow-wrap:anywhere"><small>${['Billing name','Contact','Email','Address'][n]}</small><div style="white-space:pre-line">${esc(client[key]||'—')}</div></div>`).join('')}</section>`;
+  modal('Update client details?',`<p>Replace the billing details on <strong>${esc(doc.number)}</strong> with the client record below. The previous PDF will remain in Activity.</p><div class="grid2">${summary('On this invoice',preview.current)}${summary('Latest client record',preview.latest)}</div><p>Only this invoice will be updated. If it was already sent, share the updated PDF with your client separately.</p>`,'Update this invoice',async()=>{
+    const result=await api(`/api/documents/${doc.id}/client`,'PUT',{revision:preview.revision,client:preview.latest,reviewed:true});
+    if(currentDoc?.id===doc.id)await refreshEditor();
+    toast(result.unchanged?'This invoice already has the latest client details.':'Client details updated on this invoice. Previous PDF kept in Activity.');
+  });
 }
 function projectModal(){
   if(!state.clients.length){toast('Create a client first, then add the project.');clientModal();return;}
@@ -599,6 +645,7 @@ app.addEventListener('click',async e=>{
   await safe(async()=>{
     if(action==='new-client')return clientModal();
     if(action==='edit-client')return clientModal(state.clients.find(c=>c.id===b.dataset.id));
+    if(action==='update-client')return invoiceClientModal();
     if(action==='new-project')return projectModal();
     if(action==='new-document')return newDocumentModal(b.dataset.kind,b.dataset.project);
     if(action==='export-json')return exportJson();
